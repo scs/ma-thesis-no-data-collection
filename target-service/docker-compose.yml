@@ -1,0 +1,42 @@
+version: "3.7"
+
+services:
+  app:
+    build: .
+    container_name: 'target-service-app'
+    ports:
+      - '80:80'
+    links:
+      - db
+    volumes:
+      - .:/var/www
+      - ./public/.htaccess.docker:/var/www/public/.htaccess
+
+  db:
+    image: mariadb:10.3
+    container_name: 'target-service-db'
+    ports:
+      - '3306:3306'
+    environment:
+      - MYSQL_DATABASE=target-service
+      - MYSQL_ROOT_PASSWORD=will-be-randomized-and-output-on-the-console
+      - MYSQL_RANDOM_ROOT_PASSWORD=yes
+      - MYSQL_USER=target-service
+      - MYSQL_PASSWORD=target-service
+
+  node:
+    image: node:14
+    container_name: 'target-service-npm'
+    working_dir: '/app'
+    volumes:
+      - .:/app
+    command: bash -c "npm install && npm run watch"
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: 'target-service-phpmyadmin'
+    links:
+      - db
+    ports:
+      - '8081:80'
+

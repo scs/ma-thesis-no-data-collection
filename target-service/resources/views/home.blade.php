@@ -17,9 +17,13 @@
                         {{__('Hello Guest')}}
                     @else
                         {{ __('You are logged in!') }}
+<<<<<<< HEAD
                             {{$users ?? '' }}
                     @endguest
 
+=======
+                    @endguest
+>>>>>>> Add target-service
                 </div>
             </div>
         </div>

@@ -20,7 +20,10 @@ Route::get('/', function () {
 Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
+<<<<<<< HEAD
 Route::post('login_with_visitor', [App\Http\Controllers\LoginController::class, 'authenticate'])->name('my_login');
+=======
+>>>>>>> Add target-service
 
 Route::middleware(['auth'])->group(function () {
 

@@ -8,7 +8,11 @@
                 <div class="card-header">{{ __('Login') }}</div>
 
                 <div class="card-body">
+<<<<<<< HEAD
                     <form method="POST" action="{{ route('my_login') }}">
+=======
+                    <form method="POST" action="{{ route('login') }}">
+>>>>>>> Add target-service
                         @csrf
 
                         <div class="form-group row">

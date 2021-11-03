@@ -165,7 +165,10 @@ return [
         /*
          * Package Service Providers...
          */
+<<<<<<< HEAD
         PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
+=======
+>>>>>>> Add target-service
 
         /*
          * Application Service Providers...
@@ -230,8 +233,11 @@ return [
         'Validator' => Illuminate\Support\Facades\Validator::class,
         'View' => Illuminate\Support\Facades\View::class,
 
+<<<<<<< HEAD
         'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
 
+=======
+>>>>>>> Add target-service
     ],
 
 ];

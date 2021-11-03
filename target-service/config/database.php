@@ -62,6 +62,7 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+<<<<<<< HEAD
         'tracker' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),
@@ -81,6 +82,8 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+=======
+>>>>>>> Add target-service
 
         'pgsql' => [
             'driver' => 'pgsql',

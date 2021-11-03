@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+<<<<<<< HEAD
 use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
+=======
+>>>>>>> Add target-service
 
 class HomeController extends Controller
 {
@@ -24,10 +27,14 @@ class HomeController extends Controller
      */
     public function index()
     {
+<<<<<<< HEAD
         $visitor = Tracker::currentSession();
 
         //$users = Tracker::onlineUsers();
         $users = "";
         return view('home', ['users' => $visitor]);
+=======
+        return view('home');
+>>>>>>> Add target-service
     }
 }

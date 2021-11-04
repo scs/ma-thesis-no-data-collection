@@ -22,10 +22,15 @@ class Kernel extends HttpKernel
         \App\Http\Middleware\TrimStrings::class,
         \Illuminate\Foundation\Http\Middleware\ConvertEmptyStringsToNull::class,
 <<<<<<< HEAD
+<<<<<<< HEAD
         \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
 
 =======
 >>>>>>> Add target-service
+=======
+        \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
+
+>>>>>>> Added antonioribeiro tracker
     ];
 
     /**
@@ -43,10 +48,15 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
 <<<<<<< HEAD
+<<<<<<< HEAD
             \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
 
 =======
 >>>>>>> Add target-service
+=======
+            \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
+
+>>>>>>> Added antonioribeiro tracker
         ],
 
         'api' => [

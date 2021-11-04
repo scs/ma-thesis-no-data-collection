@@ -63,6 +63,9 @@ return [
             ]) : [],
         ],
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> Added antonioribeiro tracker
         'tracker' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),
@@ -82,8 +85,11 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+<<<<<<< HEAD
 =======
 >>>>>>> Add target-service
+=======
+>>>>>>> Added antonioribeiro tracker
 
         'pgsql' => [
             'driver' => 'pgsql',

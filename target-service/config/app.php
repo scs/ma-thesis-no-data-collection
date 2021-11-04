@@ -166,9 +166,13 @@ return [
          * Package Service Providers...
          */
 <<<<<<< HEAD
+<<<<<<< HEAD
         PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
 =======
 >>>>>>> Add target-service
+=======
+        PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
+>>>>>>> Added antonioribeiro tracker
 
         /*
          * Application Service Providers...
@@ -234,10 +238,15 @@ return [
         'View' => Illuminate\Support\Facades\View::class,
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
 
 =======
 >>>>>>> Add target-service
+=======
+        'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
+
+>>>>>>> Added antonioribeiro tracker
     ],
 
 ];

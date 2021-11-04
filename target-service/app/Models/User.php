@@ -45,14 +45,19 @@ class User extends Authenticatable
      * The attributes that should be cast.
      *
 <<<<<<< HEAD
+<<<<<<< HEAD
      * @var arraygit
 =======
      * @var array
 >>>>>>> Add target-service
+=======
+     * @var arraygit
+>>>>>>> Added antonioribeiro tracker
      */
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+<<<<<<< HEAD
 <<<<<<< HEAD
     protected $connection = 'mysql';
     public function getIsAdminAttribute()
@@ -61,4 +66,10 @@ class User extends Authenticatable
     }
 =======
 >>>>>>> Add target-service
+=======
+    public function getIsAdminAttribute()
+    {
+        return true;
+    }
+>>>>>>> Added antonioribeiro tracker
 }

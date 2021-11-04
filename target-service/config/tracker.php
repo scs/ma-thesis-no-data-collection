@@ -81,7 +81,11 @@ return [
     /*
      * Log artisan commands?
      */
+<<<<<<< HEAD
     'console_log_enabled' => true,
+=======
+    'console_log_enabled' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Log SQL queries?
@@ -136,7 +140,11 @@ return [
     /*
      * Log events?
      */
+<<<<<<< HEAD
     'log_events' => true,
+=======
+    'log_events' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Which events do you want to log exactly?
@@ -181,37 +189,65 @@ return [
      *     sudo apt-get purge php5-geoip
      *
      */
+<<<<<<< HEAD
     'log_geoip' => true,
+=======
+    'log_geoip' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log the user agent?
      */
+<<<<<<< HEAD
     'log_user_agents' => true,
+=======
+    'log_user_agents' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log your users?
      */
+<<<<<<< HEAD
     'log_users' => true,
+=======
+    'log_users' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log devices?
      */
+<<<<<<< HEAD
     'log_devices' => true,
+=======
+    'log_devices' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log languages?
      */
+<<<<<<< HEAD
     'log_languages' => true,
+=======
+    'log_languages' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log HTTP referers?
      */
+<<<<<<< HEAD
     'log_referers' => true,
+=======
+    'log_referers' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log url paths?
      */
+<<<<<<< HEAD
     'log_paths' => true,
+=======
+    'log_paths' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Do you wish to log url queries and query arguments?
@@ -221,7 +257,11 @@ return [
     /*
      * Do you wish to log routes and route parameters?
      */
+<<<<<<< HEAD
     'log_routes' => true,
+=======
+    'log_routes' => false,
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Log errors and exceptions?
@@ -237,7 +277,11 @@ return [
     /*
      * If you are storing cookies, you better change it to a name you of your own.
      */
+<<<<<<< HEAD
     'tracker_cookie_name' => 'test_cookie',
+=======
+    'tracker_cookie_name' => 'please_change_this_cookie_name',
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * Internal tracker session name.
@@ -253,7 +297,11 @@ return [
      *      protected $connection = 'mysql';
      * ...
      */
+<<<<<<< HEAD
     'user_model' => 'App\Models\User',
+=======
+    'user_model' => 'PragmaRX\Tracker\Vendor\Laravel\Models\User',
+>>>>>>> Added antonioribeiro tracker
 
     /*
      * You can use your own model for every single table Tracker has.
@@ -314,7 +362,11 @@ return [
      */
     'authentication_ioc_binding' => ['auth'], // defaults to 'auth' in Illuminate\Support\Facades\Auth
 
+<<<<<<< HEAD
     'authentication_guards' => ['web'], // defaults to []
+=======
+    'authentication_guards' => [], // defaults to []
+>>>>>>> Added antonioribeiro tracker
 
     'authenticated_check_method' => 'check', // to Auth::check()
 

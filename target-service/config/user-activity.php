@@ -4,7 +4,11 @@ return [
     'activated'        => true, // active/inactive all logging
     'middleware'       => ['web', 'auth'],
     'route_path'       => 'admin/user-activity',
+<<<<<<< HEAD
     'admin_panel_path' => 'home',
+=======
+    'admin_panel_path' => '/',
+>>>>>>> Add haruncpi/laravel-user-activity
     'delete_limit'     => 7, // default 7 days
 
     'model' => [

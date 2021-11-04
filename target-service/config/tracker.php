@@ -82,17 +82,21 @@ return [
      * Log artisan commands?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'console_log_enabled' => true,
 =======
     'console_log_enabled' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'console_log_enabled' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Log SQL queries?
      *
      * Log must be enabled for this option to work.
      */
-    'log_sql_queries' => false,
+    'log_sql_queries' => true,
 
     /*
      * If you prefer to store Tracker data on a different database or connection,
@@ -135,16 +139,20 @@ return [
      *
      * Log must be enabled for this option to work.
      */
-    'log_sql_queries_bindings' => false,
+    'log_sql_queries_bindings' => true,
 
     /*
      * Log events?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_events' => true,
 =======
     'log_events' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_events' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Which events do you want to log exactly?
@@ -190,37 +198,53 @@ return [
      *
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_geoip' => true,
 =======
     'log_geoip' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_geoip' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log the user agent?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_user_agents' => true,
 =======
     'log_user_agents' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_user_agents' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log your users?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_users' => true,
 =======
     'log_users' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_users' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log devices?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_devices' => true,
 =======
     'log_devices' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_devices' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log languages?
@@ -235,38 +259,50 @@ return [
      * Do you wish to log HTTP referers?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_referers' => true,
 =======
     'log_referers' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_referers' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log url paths?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_paths' => true,
 =======
     'log_paths' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_paths' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Do you wish to log url queries and query arguments?
      */
-    'log_queries' => false,
+    'log_queries' => true,
 
     /*
      * Do you wish to log routes and route parameters?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_routes' => true,
 =======
     'log_routes' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_routes' => true,
+>>>>>>> enable more tracking options
 
     /*
      * Log errors and exceptions?
      */
-    'log_exceptions' => false,
+    'log_exceptions' => true,
 
     /*
      * A cookie may be created on your visitor device, so you can have information

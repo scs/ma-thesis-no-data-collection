@@ -24,9 +24,14 @@
         "vue-loader": "^15.9.8",
         "vue-template-compiler": "^2.6.12"
 <<<<<<< HEAD
+<<<<<<< HEAD
     },
     "dependencies": {}
 =======
     }
 >>>>>>> Add target-service
+=======
+    },
+    "dependencies": {}
+>>>>>>> get dependencies from bower
 }

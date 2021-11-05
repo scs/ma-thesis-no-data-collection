@@ -237,7 +237,7 @@ return [
     /*
      * If you are storing cookies, you better change it to a name you of your own.
      */
-    'tracker_cookie_name' => 'please_change_this_cookie_name',
+    'tracker_cookie_name' => 'test_cookie',
 
     /*
      * Internal tracker session name.

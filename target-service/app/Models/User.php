@@ -43,6 +43,6 @@ class User extends Authenticatable
     ];
     public function getIsAdminAttribute()
     {
-        return true;
+        return auth()->id()==1;
     }
 }

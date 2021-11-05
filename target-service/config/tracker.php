@@ -96,7 +96,7 @@ return [
      *
      * Log must be enabled for this option to work.
      */
-    'log_sql_queries' => true,
+    'log_sql_queries' => false,
 
     /*
      * If you prefer to store Tracker data on a different database or connection,
@@ -139,7 +139,7 @@ return [
      *
      * Log must be enabled for this option to work.
      */
-    'log_sql_queries_bindings' => true,
+    'log_sql_queries_bindings' => false,
 
     /*
      * Log events?
@@ -225,6 +225,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_users' => true,
 =======
     'log_users' => false,
@@ -232,6 +233,9 @@ return [
 =======
     'log_users' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_users' => false,
+>>>>>>> WIP: tracking User
 
     /*
      * Do you wish to log devices?
@@ -250,10 +254,14 @@ return [
      * Do you wish to log languages?
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_languages' => true,
 =======
     'log_languages' => false,
 >>>>>>> Added antonioribeiro tracker
+=======
+    'log_languages' => true,
+>>>>>>> WIP: tracking User
 
     /*
      * Do you wish to log HTTP referers?
@@ -284,7 +292,7 @@ return [
     /*
      * Do you wish to log url queries and query arguments?
      */
-    'log_queries' => true,
+    'log_queries' => false,
 
     /*
      * Do you wish to log routes and route parameters?
@@ -302,7 +310,7 @@ return [
     /*
      * Log errors and exceptions?
      */
-    'log_exceptions' => true,
+    'log_exceptions' => false,
 
     /*
      * A cookie may be created on your visitor device, so you can have information
@@ -334,10 +342,14 @@ return [
      * ...
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'user_model' => 'App\Models\User',
 =======
     'user_model' => 'PragmaRX\Tracker\Vendor\Laravel\Models\User',
 >>>>>>> Added antonioribeiro tracker
+=======
+    'user_model' => 'App\Models\User',
+>>>>>>> WIP: tracking User
 
     /*
      * You can use your own model for every single table Tracker has.
@@ -399,10 +411,14 @@ return [
     'authentication_ioc_binding' => ['auth'], // defaults to 'auth' in Illuminate\Support\Facades\Auth
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     'authentication_guards' => ['web'], // defaults to []
 =======
     'authentication_guards' => [], // defaults to []
 >>>>>>> Added antonioribeiro tracker
+=======
+    'authentication_guards' => ['web'], // defaults to []
+>>>>>>> WIP: tracking User
 
     'authenticated_check_method' => 'check', // to Auth::check()
 

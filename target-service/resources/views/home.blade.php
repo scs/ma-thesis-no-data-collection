@@ -20,10 +20,14 @@
 <<<<<<< HEAD
                             {{$users ?? '' }}
                     @endguest
+<<<<<<< HEAD
 
 =======
                     @endguest
 >>>>>>> Add target-service
+=======
+                    {{$users ?? '' }}
+>>>>>>> WIP: tracking User
                 </div>
             </div>
         </div>

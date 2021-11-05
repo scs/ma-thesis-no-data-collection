@@ -64,10 +64,15 @@ class Kernel extends HttpKernel
             'throttle:api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
 <<<<<<< HEAD
+<<<<<<< HEAD
             \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
 
 =======
 >>>>>>> Add target-service
+=======
+            \PragmaRX\Tracker\Vendor\Laravel\Middlewares\Tracker::class,
+
+>>>>>>> Tracker update
         ],
     ];
 

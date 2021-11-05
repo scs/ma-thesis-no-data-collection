@@ -226,6 +226,7 @@ return [
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_users' => true,
 =======
     'log_users' => false,
@@ -236,6 +237,9 @@ return [
 =======
     'log_users' => false,
 >>>>>>> WIP: tracking User
+=======
+    'log_users' => true,
+>>>>>>> Tracker update
 
     /*
      * Do you wish to log devices?

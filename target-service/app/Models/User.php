@@ -59,6 +59,7 @@ class User extends Authenticatable
     ];
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     protected $connection = 'mysql';
     public function getIsAdminAttribute()
     {
@@ -67,6 +68,9 @@ class User extends Authenticatable
 =======
 >>>>>>> Add target-service
 =======
+=======
+    protected $connection = 'mysql';
+>>>>>>> Tracker update
     public function getIsAdminAttribute()
     {
         return auth()->id()==1;

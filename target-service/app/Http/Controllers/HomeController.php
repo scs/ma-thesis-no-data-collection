@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use PragmaRX\Tracker\Tracker;
 
 class HomeController extends Controller
 {
@@ -23,6 +24,8 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home');
+        //$users = Tracker::onlineUsers();
+        $users = "";
+        return view('home', ['users' => $users]);
     }
 }

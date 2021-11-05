@@ -18,6 +18,7 @@
                     @else
                         {{ __('You are logged in!') }}
                     @endguest
+                    {{$users ?? '' }}
                 </div>
             </div>
         </div>

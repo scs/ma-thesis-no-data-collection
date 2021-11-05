@@ -326,10 +326,14 @@ return [
      * If you are storing cookies, you better change it to a name you of your own.
      */
 <<<<<<< HEAD
+<<<<<<< HEAD
     'tracker_cookie_name' => 'test_cookie',
 =======
     'tracker_cookie_name' => 'please_change_this_cookie_name',
 >>>>>>> Added antonioribeiro tracker
+=======
+    'tracker_cookie_name' => 'test_cookie',
+>>>>>>> Logging UserID
 
     /*
      * Internal tracker session name.

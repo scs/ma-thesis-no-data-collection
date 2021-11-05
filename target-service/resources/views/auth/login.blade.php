@@ -9,10 +9,14 @@
 
                 <div class="card-body">
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <form method="POST" action="{{ route('my_login') }}">
 =======
                     <form method="POST" action="{{ route('login') }}">
 >>>>>>> Add target-service
+=======
+                    <form method="POST" action="{{ route('my_login') }}">
+>>>>>>> Logging UserID
                         @csrf
 
                         <div class="form-group row">

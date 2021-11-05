@@ -21,9 +21,13 @@ Auth::routes();
 
 Route::get('/home', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 <<<<<<< HEAD
+<<<<<<< HEAD
 Route::post('login_with_visitor', [App\Http\Controllers\LoginController::class, 'authenticate'])->name('my_login');
 =======
 >>>>>>> Add target-service
+=======
+Route::post('login_with_visitor', [App\Http\Controllers\LoginController::class, 'authenticate'])->name('my_login');
+>>>>>>> Logging UserID
 
 Route::middleware(['auth'])->group(function () {
 

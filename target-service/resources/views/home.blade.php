@@ -18,6 +18,7 @@
                     @else
                         {{ __('You are logged in!') }}
 <<<<<<< HEAD
+<<<<<<< HEAD
                             {{$users ?? '' }}
                     @endguest
 <<<<<<< HEAD
@@ -28,6 +29,11 @@
 =======
                     {{$users ?? '' }}
 >>>>>>> WIP: tracking User
+=======
+                            {{$users ?? '' }}
+                    @endguest
+
+>>>>>>> Logging UserID
                 </div>
             </div>
         </div>

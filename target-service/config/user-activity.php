@@ -4,11 +4,11 @@ return [
     'activated'        => true, // active/inactive all logging
     'middleware'       => ['web', 'auth'],
     'route_path'       => 'admin/user-activity',
-    'admin_panel_path' => '/',
+    'admin_panel_path' => 'home',
     'delete_limit'     => 7, // default 7 days
 
     'model' => [
-        'user' => "App\Models\User"
+        'user' => "App\User"
     ],
 
     'log_events' => [

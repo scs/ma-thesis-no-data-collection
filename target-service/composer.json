@@ -10,6 +10,7 @@
         "geoip/geoip": "~1.14",
         "geoip2/geoip2": "~2.0",
         "guzzlehttp/guzzle": "^7.0.1",
+        "haruncpi/laravel-user-activity": "^1.0",
         "laravel/framework": "^8.65",
         "laravel/sanctum": "^2.11",
         "laravel/tinker": "^2.5",

@@ -41,6 +41,7 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+    protected $connection = 'mysql';
     public function getIsAdminAttribute()
     {
         return auth()->id()==1;

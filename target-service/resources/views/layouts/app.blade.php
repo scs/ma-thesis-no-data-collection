@@ -34,6 +34,7 @@
                     <!-- Left Side Of Navbar -->
                     <ul class="navbar-nav mr-auto">
 <<<<<<< HEAD
+<<<<<<< HEAD
                         <li class="nav-item">
                             <a class="nav-link" href="{{ route('tracker.stats.index') }}">{{ __('Stats') }}</a>
                         </li>
@@ -43,6 +44,11 @@
 =======
 
 >>>>>>> Add target-service
+=======
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('tracker.stats.index') }}">{{ __('Stats') }}</a>
+                        </li>
+>>>>>>> Add small navigation to stats
                     </ul>
 
                     <!-- Right Side Of Navbar -->

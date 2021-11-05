@@ -3,9 +3,13 @@
 namespace App\Models;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 use Haruncpi\LaravelUserActivity\Traits\Loggable;
 =======
 >>>>>>> Add target-service
+=======
+use Haruncpi\LaravelUserActivity\Traits\Loggable;
+>>>>>>> Add Again Haruncpi
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -15,10 +19,14 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
     use HasApiTokens, HasFactory, Notifiable, Loggable;
 =======
     use HasApiTokens, HasFactory, Notifiable;
 >>>>>>> Add target-service
+=======
+    use HasApiTokens, HasFactory, Notifiable, Loggable;
+>>>>>>> Add Again Haruncpi
 
     /**
      * The attributes that are mass assignable.

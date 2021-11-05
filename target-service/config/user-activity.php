@@ -5,14 +5,18 @@ return [
     'middleware'       => ['web', 'auth'],
     'route_path'       => 'admin/user-activity',
 <<<<<<< HEAD
+<<<<<<< HEAD
     'admin_panel_path' => 'home',
 =======
     'admin_panel_path' => '/',
 >>>>>>> Add haruncpi/laravel-user-activity
+=======
+    'admin_panel_path' => 'home',
+>>>>>>> Add Again Haruncpi
     'delete_limit'     => 7, // default 7 days
 
     'model' => [
-        'user' => "App\Models\User"
+        'user' => "App\User"
     ],
 
     'log_events' => [

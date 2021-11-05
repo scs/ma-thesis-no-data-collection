@@ -41,6 +41,7 @@
                         <li class="nav-item">
                             <a class="nav-link" href="admin/user-activity">{{ __('User-Activity') }}</a>
                         </li>
+<<<<<<< HEAD
 =======
 
 >>>>>>> Add target-service
@@ -49,6 +50,8 @@
                             <a class="nav-link" href="{{ route('tracker.stats.index') }}">{{ __('Stats') }}</a>
                         </li>
 >>>>>>> Add small navigation to stats
+=======
+>>>>>>> Add Again Haruncpi
                     </ul>
 
                     <!-- Right Side Of Navbar -->

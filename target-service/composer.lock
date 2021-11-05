@@ -7,6 +7,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "content-hash": "dc8d0d1cf9e67b2de8bc7263f20c956e",
 =======
     "content-hash": "4e38664dc2e1313269ea0f10ec8cbadf",
@@ -17,6 +18,9 @@
 =======
     "content-hash": "99c9e8b12a541e9a2b48552e467b0dbc",
 >>>>>>> Logging UserID
+=======
+    "content-hash": "dc8d0d1cf9e67b2de8bc7263f20c956e",
+>>>>>>> Add Again Haruncpi
     "packages": [
         {
             "name": "asm89/stack-cors",
@@ -2305,6 +2309,58 @@
             ],
             "time": "2021-10-06T17:43:30+00:00"
 >>>>>>> Add target-service
+        },
+        {
+            "name": "haruncpi/laravel-user-activity",
+            "version": "v1.0.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/haruncpi/laravel-user-activity.git",
+                "reference": "bc2c31b43b99c494d182650e739732f4d720ff7d"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/haruncpi/laravel-user-activity/zipball/bc2c31b43b99c494d182650e739732f4d720ff7d",
+                "reference": "bc2c31b43b99c494d182650e739732f4d720ff7d",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=5.6"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Haruncpi\\LaravelUserActivity\\ServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Haruncpi\\LaravelUserActivity\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "cc-by-4.0"
+            ],
+            "authors": [
+                {
+                    "name": "MD.HARUN-UR-RASHID",
+                    "email": "harun.cox@gmail.com"
+                }
+            ],
+            "description": "Monitor user activity easily!",
+            "keywords": [
+                "activity",
+                "laravel",
+                "user"
+            ],
+            "support": {
+                "issues": "https://github.com/haruncpi/laravel-user-activity/issues",
+                "source": "https://github.com/haruncpi/laravel-user-activity/tree/v1.0.4"
+            },
+            "time": "2021-03-03T05:23:49+00:00"
         },
         {
             "name": "jaybizzle/crawler-detect",

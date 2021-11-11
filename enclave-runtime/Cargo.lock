@@ -466,6 +466,7 @@ dependencies = [
  "env_logger",
  "frame-support",
  "hex",
+ "http_req",
  "httparse 1.5.1",
  "ipfs-unixfs",
  "ita-stf",
@@ -1015,6 +1016,18 @@ dependencies = [
  "fnv 1.0.6",
  "itoa 0.4.5",
  "sgx_tstd",
+]
+
+[[package]]
+name = "http_req"
+version = "0.7.2"
+source = "git+https://github.com/mesalock-linux/http_req-sgx#5d0f7474c73b70d2dbdda69c1db2a2e31aee6eb8"
+dependencies = [
+ "rustls 0.19.0 (git+https://github.com/mesalock-linux/rustls?branch=mesalock_sgx)",
+ "sgx_tstd",
+ "unicase",
+ "webpki",
+ "webpki-roots 0.21.0 (git+https://github.com/mesalock-linux/webpki-roots?branch=mesalock_sgx)",
 ]
 
 [[package]]
@@ -3564,6 +3577,15 @@ dependencies = [
  "crunchy",
  "hex",
  "static_assertions",
+]
+
+[[package]]
+name = "unicase"
+version = "2.6.0"
+source = "git+https://github.com/mesalock-linux/unicase-sgx#0b0519348572927118af47af3da4da9ffdca8ec6"
+dependencies = [
+ "sgx_tstd",
+ "version_check",
 ]
 
 [[package]]

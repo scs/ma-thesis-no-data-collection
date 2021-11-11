@@ -31,6 +31,16 @@ extern crate sgx_tstd as std;
 
 #[cfg(not(feature = "test"))]
 use sgx_types::size_t;
+use std::io as mainio;
+use mainio::Write;
+
+use http_req::{request::RequestBuilder, tls, uri::Uri};
+use std::ffi::CStr;
+use std::ffi::CString;
+
+use std::net::TcpStream;
+//use std::os::raw::c_char;
+use std::prelude::v1::*;
 
 use crate::{
 	error::{Error, Result},
@@ -285,6 +295,80 @@ pub unsafe extern "C" fn mock_register_enclave_xt(
 	*nonce += 1;
 
 	write_slice_and_whitespace_pad(extrinsic_slice, xt);
+	sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn hello_world(		
+	some_string: *const u8,
+	len: usize,
+) -> sgx_status_t {
+	let str_slice = slice::from_raw_parts(some_string, len);
+	let _ = mainio::stdout().write(str_slice);
+	println!("{}", &str_slice[0]);
+	//let ne = String::from_utf8(str_slice).unwrap();
+	let rust_raw_string = "This is a in-Enclave";
+
+	let wor:[u8;4] = [82, 117, 115, 116];
+	
+	let word_vec:Vec<u8> = vec![32, 115, 116, 114, 105, 110, 103, 33];
+
+	let mut hello_string = String::from(rust_raw_string);
+
+	for c in wor.iter() { //use str_slice 
+		hello_string.push(*c as char);
+	}
+	hello_string += String::from_utf8(word_vec).expect("Invalid UTF-8").as_str();
+
+	println!("{}", &hello_string);
+
+	let hostname = "test.benelli.dev";
+    let port = 443;
+
+    let hostname = format!("https://{}:{}", hostname, port);
+	//println!("{}", hostname);
+    let c_hostname = CString::new(hostname.to_string()).unwrap();
+	/* debug c_hostname
+	println!("{:?}", c_hostname);
+	*/
+	let c_hostname = c_hostname.as_ptr();
+	
+	if c_hostname.is_null() {
+        return sgx_status_t::SGX_ERROR_UNEXPECTED;
+    }
+
+    let hostname = CStr::from_ptr(c_hostname).to_str();
+	/* debug hostname
+	println!("{:?}", hostname);
+	*/
+    let hostname = hostname.expect("Failed to recover hostname");
+
+    //Parse uri and assign it to variable `addr`
+    let addr: Uri = hostname.parse().unwrap();
+	println!("{:?}", addr);
+    //Construct a domain:ip string for tcp connection
+    let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap());
+
+    //Connect to remote host
+    let stream = TcpStream::connect(conn_addr).unwrap();
+
+    //Open secure connection over TlsStream, because of `addr` (https)
+    let mut stream = tls::Config::default()
+        .connect(addr.host().unwrap_or(""), stream)
+        .unwrap();
+
+    //Container for response's body
+    let mut writer = Vec::new();
+
+    //Add header `Connection: Close`
+    let response = RequestBuilder::new(&addr)
+        .header("Connection", "Close")
+        .send(&mut stream, &mut writer)
+        .unwrap();
+
+    println!("{}", String::from_utf8_lossy(&writer));
+    println!("Status: {} {}", response.status_code(), response.reason());
+
 	sgx_status_t::SGX_SUCCESS
 }
 

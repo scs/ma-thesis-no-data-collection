@@ -297,6 +297,8 @@ fn my_func<E, T, D>(
 	println!("Initializing the enclave");
 	let mrenclave = enclave.get_mrenclave().unwrap();
 	println!("MRENCLAVE={}", mrenclave.to_base58());
+
+	/*
 	// ------------------------------------------------------------------------
 	// let new workers call us for key provisioning
 	println!("MU-RA server listening on ws://{}", config.mu_ra_url());
@@ -427,15 +429,55 @@ fn my_func<E, T, D>(
 			);
 		})
 		.unwrap();
-	let mut ctr = 0;
-	loop {
-		if ctr < 100 {
-			println!("{}", ctr);
-			ctr = ctr+1;
+		*/
+	println!("Testing simple helloworld function");
+	let input_string = String::from("This string is passed into Enclave \n");
+	let result = enclave.hello_world(input_string.as_ptr() as * const u8,
+									 input_string.len()
+									);
+	match result {
+		sgx_status_t::SGX_SUCCESS => {},
+		_ => {
+			println!("[-] ECALL Enclave Failes {}!", result.as_str());
+			return;
 		}
 	}
+	println!("[+] hello world in enclave was a success");
+		/*
+	println!("Testing Access to target-service");
+	/*
+	let mut writer = Vec::new(); //container for body of a response
+	const BODY: &[u8; 38] = b"email=usera@user.com&password=User1234";
 
+    let res = request::post("https://test.benelli.dev/login_with_visitor", BODY, &mut writer).unwrap();
 
+    println!("Status: {} {}", res.status_code(), res.reason());
+	println!("Answer: {:?}", res.content_len());
+	*/
+    let hostname = "www.rust-lang.org";
+    let port = 443;
+
+    let hostname = format!("https://{}:{}", hostname, port);
+    let c_hostname = CString::new(hostname.to_string()).unwrap();
+
+    let result = unsafe {
+        send_http_request(
+            enclave.geteid(),
+            &mut retval,
+            c_hostname.as_ptr() as *const c_char,
+        )
+    };
+
+    match result {
+        sgx_status_t::SGX_SUCCESS => {}
+        _ => {
+            println!("[-] ECALL Enclave Failed {}!", result.as_str());
+            return;
+        }
+    }
+
+    println!("[+] send_http_request success...");
+	*/
 }
 /// FIXME: needs some discussion (restructuring?)
 #[allow(clippy::too_many_arguments)]

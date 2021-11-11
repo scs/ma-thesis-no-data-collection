@@ -30,6 +30,12 @@ pub trait TeerexApi: Send + Sync + 'static {
 		nonce: u32,
 		w_url: &str,
 	) -> EnclaveResult<Vec<u8>>;
+	// Testing Hello World function
+	fn hello_world(
+		&self,
+		some_string: *const u8,
+		len: usize
+	) -> sgx_status_t;
 }
 
 impl TeerexApi for Enclave {
@@ -64,5 +70,24 @@ impl TeerexApi for Enclave {
 		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
 
 		Ok(response)
+	}
+
+	fn hello_world(
+		&self,
+		some_string: *const u8,
+		len: usize
+	) -> sgx_status_t{
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+		println!("[->] Calling ffi::hello_world");
+		let result = unsafe {
+			ffi::hello_world(
+				self.eid,
+				&mut retval,
+				some_string, 
+				len,
+			)
+		};
+		eprintln!("[<-] Returning from ffi::hello_world");
+		return result;
 	}
 }

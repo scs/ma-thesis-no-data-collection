@@ -44,6 +44,7 @@ use itp_enclave_api::{
 	remote_attestation::{RemoteAttestation, TlsRemoteAttestation},
 	sidechain::Sidechain,
 	teerex_api::TeerexApi,
+	mixnet::MixNet,
 };
 use itp_settings::{
 	files::{
@@ -278,6 +279,7 @@ fn my_func<E, T, D>(
 		+ RemoteAttestation
 		+ TlsRemoteAttestation
 		+ TeerexApi
+		+ MixNet
 		+ Clone,
 	D: BlockPruner + Sync + Send + 'static,
 {
@@ -427,6 +429,7 @@ fn my_func<E, T, D>(
 		*/
 	println!("Testing simple helloworld function");
 	let input_string = String::from("This string is passed into Enclave \n");
+	/*
 	let result = enclave.hello_world(input_string.as_ptr() as * const u8,
 									 input_string.len()
 									);
@@ -436,7 +439,10 @@ fn my_func<E, T, D>(
 			println!("[-] ECALL Enclave Failes {}!", result.as_str());
 			return;
 		}
-	}
+	}*/
+	enclave.hello_world(input_string.as_ptr() as * const u8,
+						input_string.len()
+						);
 	println!("[+] hello world in enclave was a success");
 		/*
 	println!("Testing Access to target-service");

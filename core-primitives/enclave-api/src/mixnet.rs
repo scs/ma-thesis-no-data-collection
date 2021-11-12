@@ -15,54 +15,43 @@
 	limitations under the License.
 
 */
-
 use crate::{error::Error, Enclave, EnclaveResult};
+/*
 use codec::Encode;
 use frame_support::{ensure, sp_runtime::app_crypto::sp_core::H256};
+*/
+use frame_support::ensure;
 use itp_enclave_api_ffi as ffi;
 use sgx_types::*;
 
-pub trait TeerexApi: Send + Sync + 'static {
-	/// Register enclave xt with an empty attestation report.
-	fn mock_register_xt(
+pub trait MixNet: Send + Sync + 'static {
+	// Testing Hello World function
+	fn hello_world(
 		&self,
-		genesis_hash: H256,
-		nonce: u32,
-		w_url: &str,
-	) -> EnclaveResult<Vec<u8>>;
+		some_string: *const u8,
+		len: usize
+	) -> EnclaveResult<()>;
 }
 
-impl TeerexApi for Enclave {
-	fn mock_register_xt(
+impl MixNet for Enclave {
+	fn hello_world(
 		&self,
-		genesis_hash: H256,
-		nonce: u32,
-		w_url: &str,
-	) -> EnclaveResult<Vec<u8>> {
+		some_string: *const u8,
+		len: usize
+	) -> EnclaveResult<()>{
 		let mut retval = sgx_status_t::SGX_SUCCESS;
-		let response_len = 8192;
-		let mut response: Vec<u8> = vec![0u8; response_len as usize];
-
-		let url = w_url.encode();
-		let gen = genesis_hash.as_bytes().to_vec();
-
-		let res = unsafe {
-			ffi::mock_register_enclave_xt(
+		println!("[->] Calling ffi::hello_world");
+		let result = unsafe {
+			ffi::hello_world(
 				self.eid,
 				&mut retval,
-				gen.as_ptr(),
-				gen.len() as u32,
-				&nonce,
-				url.as_ptr(),
-				url.len() as u32,
-				response.as_mut_ptr(),
-				response_len,
+				some_string, 
+				len,
 			)
 		};
-
-		ensure!(res == sgx_status_t::SGX_SUCCESS, Error::Sgx(res));
-		ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
-
-		Ok(response)
+		eprintln!("[<-] Returned from ffi::hello_world");
+        ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+        ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+		Ok(())
 	}
 }

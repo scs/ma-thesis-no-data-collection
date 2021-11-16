@@ -163,9 +163,7 @@ fn main() {
 			node_api,
 			tokio_handle,
 		);
-	} else if let Some(smatches) = matches.subcommand_matches("helloworld") {
-		println!("Starting my test function");
-		
+	} else if let Some(smatches) = matches.subcommand_matches("mixnet") {
 		let shard = extract_shard(&smatches, enclave.as_ref());
 
 		// Todo: Is this deprecated?? It is only used in remote attestation.
@@ -262,15 +260,16 @@ fn main() {
 	}
 }
 #[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
 //fn my_func<E>(	
 fn my_func<E, T, D>(
-	config: Config,
+	_config: Config,
 	shard: &ShardIdentifier,
 	enclave: Arc<E>,
-	sidechain_storage: Arc<D>,
-	skip_ra: bool,
-	mut node_api: Api<sr25519::Pair, WsRpcClient>,
-	tokio_handle: Arc<T>,
+	_sidechain_storage: Arc<D>,
+	_skip_ra: bool,
+	mut _node_api: Api<sr25519::Pair, WsRpcClient>,
+	_tokio_handle: Arc<T>,
 ) where
 	T: GetTokioHandle,
 	E: EnclaveBase
@@ -427,58 +426,18 @@ fn my_func<E, T, D>(
 		})
 		.unwrap();
 		*/
+
+
+	/* Added Code 
 	println!("Testing simple helloworld function");
 	let input_string = String::from("This string is passed into Enclave \n");
-	/*
-	let result = enclave.hello_world(input_string.as_ptr() as * const u8,
-									 input_string.len()
-									);
-	match result {
-		sgx_status_t::SGX_SUCCESS => {},
-		_ => {
-			println!("[-] ECALL Enclave Failes {}!", result.as_str());
-			return;
-		}
-	}*/
 	enclave.hello_world(input_string.as_ptr() as * const u8,
 						input_string.len()
-						);
+	).unwrap();
 	println!("[+] hello world in enclave was a success");
-		/*
-	println!("Testing Access to target-service");
-	/*
-	let mut writer = Vec::new(); //container for body of a response
-	const BODY: &[u8; 38] = b"email=usera@user.com&password=User1234";
-
-    let res = request::post("https://test.benelli.dev/login_with_visitor", BODY, &mut writer).unwrap();
-
-    println!("Status: {} {}", res.status_code(), res.reason());
-	println!("Answer: {:?}", res.content_len());
 	*/
-    let hostname = "www.rust-lang.org";
-    let port = 443;
+	enclave.login().unwrap();
 
-    let hostname = format!("https://{}:{}", hostname, port);
-    let c_hostname = CString::new(hostname.to_string()).unwrap();
-
-    let result = unsafe {
-        send_http_request(
-            enclave.geteid(),
-            &mut retval,
-            c_hostname.as_ptr() as *const c_char,
-        )
-    };
-
-    match result {
-        sgx_status_t::SGX_SUCCESS => {}
-        _ => {
-            println!("[-] ECALL Enclave Failed {}!", result.as_str());
-            return;
-        }
-    }
-
-    println!("[+] send_http_request success...");
-	*/
 }
 /// FIXME: needs some discussion (restructuring?)
 #[allow(clippy::too_many_arguments)]

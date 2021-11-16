@@ -91,6 +91,8 @@ enclave {
 			[in, size=len] const uint8_t* some_string, size_t len
 		);
 
+		public sgx_status_t login();
+
 		public sgx_status_t dump_ra_to_disk();
 
 		public sgx_status_t run_key_provisioning_server(int fd, sgx_quote_sign_type_t quote_type, int skip_ra);

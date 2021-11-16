@@ -31,6 +31,9 @@ pub trait MixNet: Send + Sync + 'static {
 		some_string: *const u8,
 		len: usize
 	) -> EnclaveResult<()>;
+	fn login(
+		&self
+	) -> EnclaveResult<()>;
 }
 
 impl MixNet for Enclave {
@@ -49,8 +52,35 @@ impl MixNet for Enclave {
 				len,
 			)
 		};
-		eprintln!("[<-] Returned from ffi::hello_world");
-        ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+		println!("[<-] Returned from ffi::hello_world");
+		match result {
+			sgx_status_t::SGX_SUCCESS => {},
+			_ => {
+				println!("[-] ECALL Enclave Failes {}!", result.as_str());
+			}
+		}
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
+        ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
+		Ok(())
+	}
+
+	fn login(
+		&self
+	) -> EnclaveResult<()> {
+		let mut retval = sgx_status_t::SGX_SUCCESS;
+		let result = unsafe {
+			ffi::login(
+				self.eid,
+				&mut retval,
+			)
+		};
+		match result {
+			sgx_status_t::SGX_SUCCESS => {},
+			_ => {
+				println!("[-] ECALL Enclave Failes {}!", result.as_str());
+			}
+		}
+		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
         ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
 		Ok(())
 	}

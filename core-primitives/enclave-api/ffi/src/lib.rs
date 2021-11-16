@@ -123,6 +123,11 @@ extern "C" {
 		len: usize,
 	) -> sgx_status_t;
 
+	pub fn login(
+		eid: sgx_enclave_id_t,
+		retval: *mut sgx_status_t,
+	) -> sgx_status_t;
+
 	pub fn run_key_provisioning_server(
 		eid: sgx_enclave_id_t,
 		retval: *mut sgx_status_t,

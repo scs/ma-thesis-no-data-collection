@@ -83,14 +83,20 @@ use substrate_api_client::compose_extrinsic_offline;
 
 use std::io::Write;
 
-use http_req::{request::{RequestBuilder,Method}, tls, uri::Uri, response::StatusCode};
+//use itc_rest_client::{http_client::HttpClient, rest_client::RestClient, RestGet, RestPath};
+
+
+use http_req::{request::{RequestBuilder,Method}, tls, uri::Uri, response::StatusCode, response};
 //use std::ffi::CStr;
 //use std::ffi::CString;
-
 use std::net::TcpStream;
+use std::net::TcpListener;
 //use std::os::raw::c_char;
 //use std::prelude::v1::*;
 use regex::Regex;
+//from tutorial (doc.rust.lang.org/book)
+use std::io::prelude::*;
+//use std::fs;
 
 mod attestation;
 mod global_components;
@@ -296,16 +302,76 @@ pub unsafe extern "C" fn hello_world(
 
 #[no_mangle]
 pub unsafe extern "C" fn login() -> sgx_status_t {
+	println!("[+] Entered Enclave");
+
+	/*
+	
+	let base_url = Url::parse("https://google.com").unwrap();
+	let http_client = HttpClient::new(true, Some(Duration::from_secs(3u64)), None, None);
+	let builder = RestClient::new(http_client, base_url);
+	let res = builder.get::<String>("/".to_string()).unwrap();
+	*/
+
+	/*
+	RestGet::get("https://www.CheckTLS.com/TestReceiver
+	?CUSTOMERCODE=me@mydomain.com
+	&CUSTOMERPASS=IllNeverTell
+	&EMAIL=test@CheckTLS.com
+	&LEVEL=XML_DETAIL");
+	*/
+	println!("[+] Starting TcpListener");
+
+	let listener = TcpListener::bind("127.0.0.1:8000").unwrap();
+	for stream2 in listener.incoming() {
+		let stream2 = stream2.unwrap();
+
+		println!("handling connection:");
+		handle_connection(stream2);
+	}
+	println!("[<-] Exiting enclave");
+	sgx_status_t::SGX_SUCCESS
+}
+fn handle_connection(mut stream: TcpStream) {
+    let mut buffer = [0; 1024];
+    stream.read(&mut buffer).unwrap();
+
+	let get = b"GET / HTTP/1.1\r\n";
+	let post = b"POST /login HTTP/1.1\r\n";
+
+    if buffer.starts_with(get) {
+        let contents = io::read_to_string("hello.html").unwrap();
+
+        let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            contents.len(),
+            contents
+        );
+
+        stream.write(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+    } else if buffer.starts_with(post) {
+		println!("Request: {}", String::from_utf8_lossy(&buffer[..]));
+		println!("-----------------");
+		let wr = login_to_target_service();
+        let contents = String::from_utf8_lossy(&wr);
+
+		let response = format!(
+            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+            contents.len(),
+            contents
+        );
+		//println!("response: {:?}", response);
+		stream.write(response.as_bytes()).unwrap();
+        stream.flush().unwrap();
+    }
+}
+
+fn login_to_target_service() -> Vec<u8> {
 	/*
 	let hostname = "test.benelli.dev";
     let port = 443;
-
     let hostname = format!("https://{}:{}", hostname, port);
-	//println!("{}", hostname);
     let c_hostname = CString::new(hostname.to_string()).unwrap();
-	/* debug c_hostname
-	println!("{:?}", c_hostname);
-	*/
 	let c_hostname = c_hostname.as_ptr();
 	
 	if c_hostname.is_null() {
@@ -313,24 +379,11 @@ pub unsafe extern "C" fn login() -> sgx_status_t {
     }
 
     let hostname = CStr::from_ptr(c_hostname).to_str();
-	/* debug hostname
-	println!("{:?}", hostname);
-	*/
     let hostname = hostname.expect("Failed to recover hostname");
 
     //Parse uri and assign it to variable `addr`
     let addr: Uri = hostname.parse().unwrap();
-	
-	
-	let addr: Uri = "https://www.rust-lang.org:443/learn".parse().unwrap();
-	println!("{:?}", addr.host());
-	println!("{:?}", addr.port());
-	println!("{:?}", addr.path());
-	//let addr: Uri = Uri::try_from(String::from("https://www.rust-lang.org/learn")).unwrap();
-	println!("{:?}", addr);
 	*/
-
-	
 
 	let addr: Uri = "https://test.benelli.dev:443/login".parse().unwrap();
 
@@ -362,101 +415,65 @@ pub unsafe extern "C" fn login() -> sgx_status_t {
 	let re = Regex::new("<meta.*name=\"csrf-token\".*content=\"(.*)\".*>").unwrap(); // benelli.dev
 	//let re = Regex::new("name=\"csrf_token\".*value=\"(.*)\".*>").unwrap(); // tagesanzeiger.ch
 
-    //println!("{}", String::from_utf8_lossy(&writer));
-    println!("Status: {} {}", response.status_code(), response.reason());
+    //println!("Status: {} {}", response.status_code(), response.reason());
 	let caps = re.captures(&body_res).unwrap();
 	let token = caps.get(1).unwrap().as_str();
-	println!("csrf-token: {:?}", token);
+	//println!("csrf-token: {:?}", token);
 	let mut body_str = String::from("_token=");
 	body_str += token;
 	let credentials = "&email=userb@userb.com&password=User1234";
 	body_str+=credentials;
-	println!("{}", body_str);
-	println!("headers: {}", response.headers());
+	//println!("{}", body_str);
+	//println!("headers: {}", response.headers());
 	//let cookie_re = Regex::new("Set-Cookie: (.*?)").unwrap();
 	let set_cookies = response.headers().get("Set-Cookie").unwrap();
-	println!("{:?}", set_cookies);
+	//println!("{:?}", set_cookies);
 	//let headers = String::from(response.headers().unwrap());
 	/*
 	for cookie_cap in cookie_re.captures_iter(response.headers()) {
 		println!("test: {:?}", cookie_cap);
 	}
 	*/
-	
-	/*
-	let mut writer = Vec::new();
-
-    //Add header `Connection: Close`
-    let response = RequestBuilder::new(&addr)
-        .header("Connection", "keep-alive")
-		.header("Cookie", set_cookies)
-        .send(&mut stream, &mut writer)
-        .unwrap();
-
-	//println!("{:?}", response.headers());
-	println!("testing: ");
-	println!("{}", response.headers());
-
-	let body_res = String::from_utf8_lossy(&writer);
-    println!("Status: {} {}", response.status_code(), response.reason());
-	let caps = re.captures(&body_res).unwrap();
-	let token = caps.get(1).unwrap().as_str();
-	println!("csrf-token: {:?}", token);
-	*/
-	//println!("{:?}", serde_json::from_str(body_str.as_str()));
 
 	let addr: Uri = "https://test.benelli.dev/login_with_visitor".parse().unwrap();
 	//let addr: Uri = "https://httpbin.org/post".parse().unwrap();
-	/*
-	let stream = TcpStream::connect((addr.host().unwrap(), addr.corr_port())).unwrap();
-	let mut stream = tls::Config::default()
-		.connect(addr.host().unwrap_or(""), stream)
-		.unwrap();
-		*/
 	let mut writer = Vec::new();
-
-	//let new_body = "email=userb@userb.com&password=User1234";
-	//let BODY = new_body.as_bytes();
-	//const BODY: &[u8; 38] = b"email=usera@user.com&password=User1234";
-	//println!("{:?}", BODY);
-
-	let BODY = body_str.as_bytes();
+	let body = body_str.as_bytes();
 
 
     let response2 = RequestBuilder::new(&addr)
 		.method(Method::POST)
-		.body(BODY)
+		.body(body)
 		.header("content-type", "application/x-www-form-urlencoded")
-		.header("Content-Length", &BODY.len())
+		.header("Content-Length", &body.len())
 		.header("Cookie", set_cookies)
         .header("Connection", "Keep-Alive")
         .send(&mut stream, &mut writer)
         .unwrap();
 	
-	println!("Status: {} {}", response2.status_code(), response2.reason());
+	//println!("Status: {} {}", response2.status_code(), response2.reason());
 	let set_cookies = response2.headers().get("Set-Cookie").unwrap();
-	println!("{:?}", set_cookies);
+	//println!("{:?}", set_cookies);
 
-	println!("Call executed");
+	//println!("Call executed");
 	//println!("{}", String::from_utf8_lossy(&writer));
 	//println!("{}", response2.headers());
-	const redirect_code: StatusCode = StatusCode::new(302);	
-	println!("Comparing: {} and {}", redirect_code, response2.status_code());	
-	let addr: Uri = if response2.status_code() == redirect_code {
+	const REDIRECT_CODE: StatusCode = StatusCode::new(302);	
+	//println!("Comparing: {} and {}", REDIRECT_CODE, response2.status_code());	
+	let addr: Uri = if response2.status_code() == REDIRECT_CODE {
 		response2.headers().get("Location").unwrap().parse().unwrap()
 	} else { addr };
 	let mut writer = Vec::new();
 	//Add header `Connection: Close`
-	println!("{}", addr);
+	//println!("{}", addr);
 	println!("[+] Last Call, as logged in User");
-	let response = RequestBuilder::new(&addr)
+	let _response = RequestBuilder::new(&addr)
 		.header("Connection", "Close")
 		.header("Cookie", set_cookies)
 		.send(&mut stream, &mut writer)
 		.unwrap();
-	println!("{}", String::from_utf8_lossy(&writer));
-	println!("[<-] Exiting enclave");
-	sgx_status_t::SGX_SUCCESS
+	//println!("{}", String::from_utf8_lossy(&writer));
+	writer
 }
 
 fn create_extrinsics<PB>(

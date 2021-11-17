@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Login Sample Page!</title>
+  </head>
+  <style>
+    .center {
+      margin: 0 auto;
+      width: 300px;
+    }
+    form {
+      margin:0 auto;
+      width:300px
+    }
+    input {
+      margin-bottom:3px;
+      padding:10px;
+      width: 100%;
+      border:1px solid #CCC
+    }
+    button {
+      padding:10px
+    }
+    label {
+      cursor:pointer
+    }
+  </style>
+  <body>
+    <div class="center">
+      <h1>Hello!</h1>
+      <p>Provide your login details</p>
+    </div>
+    <form id='login-form' action="/login" method='post'>
+      <input name="username" id="username" type="text" placeholder="Username" required>
+      <input name="password" id="password" type="password" placeholder="Password" required>
+      <button type='submit'>Login</button>
+    </form>
+  </body>
+</html>

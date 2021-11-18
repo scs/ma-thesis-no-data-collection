@@ -332,41 +332,55 @@ pub unsafe extern "C" fn login() -> sgx_status_t {
 	sgx_status_t::SGX_SUCCESS
 }
 fn handle_connection(mut stream: TcpStream) {
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; 2048];
     stream.read(&mut buffer).unwrap();
 
 	let get = b"GET / HTTP/1.1\r\n";
-	let post = b"POST /login HTTP/1.1\r\n";
+	let post_login = b"POST /login HTTP/1.1\r\n";
 
-    if buffer.starts_with(get) {
-        let contents = io::read_to_string("hello.html").unwrap();
-
-        let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-            contents.len(),
-            contents
-        );
-
-        stream.write(response.as_bytes()).unwrap();
-        stream.flush().unwrap();
-    } else if buffer.starts_with(post) {
+	let (status_line, contents) = if buffer.starts_with(post_login) {
+		let request = String::from_utf8_lossy(&buffer[..]);
 		println!("Request: {}", String::from_utf8_lossy(&buffer[..]));
+		println!("Received login request");
 		println!("-----------------");
-		let wr = login_to_target_service();
-        let contents = String::from_utf8_lossy(&wr);
+		println!("generating user_credentials");
+		let cre_re = Regex::new("username=([^&]*).*&password=([^&]*)").unwrap(); // benelli.dev
+		let cre_caps = cre_re.captures(&request).unwrap();
+		let username = cre_caps.get(1).unwrap().as_str();
+		let pw = cre_caps.get(2).unwrap().as_str();
+		//println!("username: {}, pw: {} ", username, pw);
+		
+		//let my_str = "&email=userb@user.com&password=User1234";
+		let my_str = format!("&email={}&password={}", username, pw);
+		println!("Try login");
+		let wr = login_to_target_service(my_str.as_str());
+        let contents = String::from_utf8_lossy(&wr).to_string();
+		println!("[+] Successfull login, returning page");
+		("HTTP/1.1 200 OK", contents)
+    } else {
+		let (other_status_line, filename) = if buffer.starts_with(get) {
+			("HTTP/1.1 200 OK", "hello.html")
+		} else {
+			("HTTP/1.1 404 NOT FOUND", "404.html")
+		};
+		let html_base_dir = "html";
+		let path = format!("{}/{}", html_base_dir, filename);
+		let contents = io::read_to_string(&path).unwrap();
+		(other_status_line, contents)
+    };
+	let response = format!(
+        "{}\r\nContent-Length: {}\r\n\r\n{}",
+        status_line,
+        contents.len(),
+        contents
+    );
 
-		let response = format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
-            contents.len(),
-            contents
-        );
-		//println!("response: {:?}", response);
-		stream.write(response.as_bytes()).unwrap();
-        stream.flush().unwrap();
-    }
+    stream.write(response.as_bytes()).unwrap();
+    stream.flush().unwrap();
 }
 
-fn login_to_target_service() -> Vec<u8> {
+fn login_to_target_service(cre: &str) -> Vec<u8> {
+	//println!("{}" ,cre);
 	/*
 	let hostname = "test.benelli.dev";
     let port = 443;
@@ -421,8 +435,9 @@ fn login_to_target_service() -> Vec<u8> {
 	//println!("csrf-token: {:?}", token);
 	let mut body_str = String::from("_token=");
 	body_str += token;
-	let credentials = "&email=userb@userb.com&password=User1234";
-	body_str+=credentials;
+	//let credentials = "&email=userb@user.com&password=User1234";
+	//body_str+=credentials;
+	body_str+=cre;
 	//println!("{}", body_str);
 	//println!("headers: {}", response.headers());
 	//let cookie_re = Regex::new("Set-Cookie: (.*?)").unwrap();

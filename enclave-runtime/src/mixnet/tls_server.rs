@@ -29,6 +29,7 @@ use std::net;
 use std::net::Shutdown;
 
 use crate::mixnet::{BASE_URL};
+use crate::mixnet::router;
 
 extern crate webpki;
 extern crate rustls;
@@ -42,8 +43,13 @@ use codec::{alloc::string::String};
 use std::{
 	string::ToString,
 };
+use httparse::*;
+
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
+
+//Router
+//static mut ROUTER: router::Router<()> = router::load_all_routes();
 
 // Which mode the server operates in.
 #[derive(Clone)]
@@ -300,17 +306,50 @@ impl Connection {
                 self.tls_session.write_all(buf).unwrap();
             }
             ServerMode::Http => { // TODO: put in here behaviour after a Request
-                self.print_incoming_data(buf);
-                self.send_http_response_once();
+                self.handle_request(buf);
+                //self.send_http_response_once();
             }
             ServerMode::Forward(_) => {
                 self.back.as_mut().unwrap().write_all(buf).unwrap();
             }
         }
     }
-    fn print_incoming_data(&mut self, buf: &[u8]){
-        let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
-        println!("What I recieved: {}", request);
+
+    fn handle_request(&mut self, buf: &[u8]){
+        //let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
+        //println!("What I recieved: {}", request);
+        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut req = Request::new(&mut headers);
+        let res = req.parse(buf).unwrap();
+        if res.is_complete(){
+            match req.path {
+                Some(ref path) => {
+                    let body_offset = res.unwrap();
+                    let body_slice = &buf[body_offset..];
+                    let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
+                    println!("Body: {}", body_str);
+                    //println!("Parsed: {:?}", req);
+                    println!("path: {}", path);
+                    // check router for path
+
+                    let router = router::load_all_routes();
+                    
+
+                    match router.recognize(path) {
+                        Ok(ref hand) => {
+                            
+                        },
+                        Err(e) => {
+
+                        }
+                    }
+                },
+                None => {
+                    // error
+                }
+            }
+        }
+        self.send_http_response_once();
     }
 
     fn send_http_response_once(&mut self) {

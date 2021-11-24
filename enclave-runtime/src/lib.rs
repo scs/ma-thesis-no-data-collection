@@ -84,7 +84,6 @@ use substrate_api_client::compose_extrinsic_offline;
 use std::io::Write;
 
 
-#[macro_use]
 extern crate lazy_static;
 mod mixnet;
 

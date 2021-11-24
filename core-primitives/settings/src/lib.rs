@@ -26,7 +26,7 @@ pub mod files {
 	pub static SHIELDING_KEY_FILE: &str = "enclave-shielding-pubkey.json";
 	pub static SIGNING_KEY_FILE: &str = "enclave-signing-pubkey.bin";
 	/// sidechain database path
-	pub static SIDECHAIN_STORAGE_PATH: &str = "sidechain_db.bin";
+	pub static SIDECHAIN_STORAGE_PATH: &str = "sidechain_db";
 	pub static SIDECHAIN_PURGE_INTERVAL: u64 = 7200; // purge sidechain every .. s
 	pub static SIDECHAIN_PURGE_LIMIT: u64 = 100; // keep the last.. sidechainblocks when purging
 
@@ -70,7 +70,7 @@ pub mod worker {
 	// size of the MR enclave
 	pub const MR_ENCLAVE_SIZE: usize = 32;
 	// factor to tune the amount of enclave funding: funding_amount = MIN_FUND_INCREASE_FACTOR*existential_deposit - balance.free
-	pub const MIN_FUND_INCREASE_FACTOR: u128 = 1_000;
+	pub const MIN_FUND_INCREASE_FACTOR: u128 = 10_000;
 }
 
 pub mod sidechain {
@@ -97,8 +97,8 @@ pub mod node {
 	pub static REGISTER_ENCLAVE: u8 = 0u8;
 	//pub static UNREGISTER_ENCLAVE: u8 = 1u8;
 	pub static CALL_WORKER: u8 = 2u8;
-	pub static CALL_CONFIRMED: u8 = 3u8;
-	pub static BLOCK_CONFIRMED: u8 = 4u8;
+	pub static PROCESSED_PARENTCHAIN_BLOCK: u8 = 3u8;
+	pub static PROPOSED_SIDECHAIN_BLOCK: u8 = 4u8;
 	pub static SHIELD_FUNDS: u8 = 5u8;
 	// bump this to be consistent with integritee-node runtime
 	pub static RUNTIME_SPEC_VERSION: u32 = 3;

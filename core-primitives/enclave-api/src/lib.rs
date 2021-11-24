@@ -22,7 +22,7 @@ pub mod enclave_test;
 pub mod error;
 pub mod mixnet;
 pub mod remote_attestation;
-pub mod side_chain;
+pub mod sidechain;
 pub mod teerex_api;
 pub mod utils;
 

@@ -43,7 +43,7 @@ use itp_enclave_api::{
 	direct_request::DirectRequest,
 	enclave_base::EnclaveBase,
 	remote_attestation::{RemoteAttestation, TlsRemoteAttestation},
-	side_chain::SideChain,
+	sidechain::Sidechain,
 	teerex_api::TeerexApi,
 	mixnet::MixNet,
 };
@@ -458,7 +458,7 @@ fn start_worker<E, T, D>(
 	T: GetTokioHandle,
 	E: EnclaveBase
 		+ DirectRequest
-		+ SideChain
+		+ Sidechain
 		+ RemoteAttestation
 		+ TlsRemoteAttestation
 		+ TeerexApi
@@ -629,7 +629,7 @@ fn start_worker<E, T, D>(
 }
 
 /// Triggers the enclave to produce a block based on a fixed time schedule.
-fn start_interval_block_production<E: EnclaveBase + SideChain>(enclave_api: &E) {
+fn start_interval_block_production<E: EnclaveBase + Sidechain>(enclave_api: &E) {
 	use itp_settings::sidechain::SLOT_DURATION;
 
 	schedule_on_repeating_intervals(
@@ -643,7 +643,7 @@ fn start_interval_block_production<E: EnclaveBase + SideChain>(enclave_api: &E) 
 /// Starts the execution of trusted getters in repeating intervals.
 ///
 /// The getters are executed in a pre-defined slot duration.
-fn start_interval_trusted_getter_execution<E: SideChain>(enclave_api: &E) {
+fn start_interval_trusted_getter_execution<E: Sidechain>(enclave_api: &E) {
 	use itp_settings::enclave::TRUSTED_GETTERS_SLOT_DURATION;
 
 	schedule_on_repeating_intervals(
@@ -747,13 +747,21 @@ fn print_events(events: Events, _sender: Sender<String>) {
 							shard.encode().to_base58()
 						);
 					},
-					my_node_runtime::pallet_teerex::RawEvent::CallConfirmed(sender, payload) => {
-						info!("[+] Received CallConfirmed event");
+					my_node_runtime::pallet_teerex::RawEvent::ProcessedParentchainBlock(
+						sender,
+						block_hash,
+						merkle_root,
+					) => {
+						info!("[+] Received ProcessedParentchainBlock event");
 						debug!("    From:    {:?}", sender);
-						debug!("    Payload: {:?}", hex::encode(payload));
+						debug!("    Block Hash: {:?}", hex::encode(block_hash));
+						debug!("    Merkle Root: {:?}", hex::encode(merkle_root));
 					},
-					my_node_runtime::pallet_teerex::RawEvent::BlockConfirmed(sender, payload) => {
-						info!("[+] Received BlockConfirmed event");
+					my_node_runtime::pallet_teerex::RawEvent::ProposedSidechainBlock(
+						sender,
+						payload,
+					) => {
+						info!("[+] Received ProposedSidechainBlock event");
 						debug!("    From:    {:?}", sender);
 						debug!("    Payload: {:?}", hex::encode(payload));
 					},
@@ -779,7 +787,7 @@ fn print_events(events: Events, _sender: Sender<String>) {
 	}
 }
 
-pub fn init_light_client<E: EnclaveBase + SideChain>(
+pub fn init_light_client<E: EnclaveBase + Sidechain>(
 	api: &Api<sr25519::Pair, WsRpcClient>,
 	enclave_api: &E,
 ) -> Header {
@@ -810,7 +818,7 @@ pub fn init_light_client<E: EnclaveBase + SideChain>(
 
 /// Subscribe to the node API finalized heads stream and trigger a parent chain sync
 /// upon receiving a new header
-fn subscribe_to_parentchain_new_headers<E: EnclaveBase + SideChain>(
+fn subscribe_to_parentchain_new_headers<E: EnclaveBase + Sidechain>(
 	enclave_api: &E,
 	api: &Api<sr25519::Pair, WsRpcClient>,
 	mut last_synced_header: Header,
@@ -836,7 +844,7 @@ fn subscribe_to_parentchain_new_headers<E: EnclaveBase + SideChain>(
 /// Gets the amount of blocks to sync from the parentchain and feeds them to the enclave.
 ///
 ///
-pub fn sync_parentchain<E: EnclaveBase + SideChain>(
+pub fn sync_parentchain<E: EnclaveBase + Sidechain>(
 	enclave_api: &E,
 	api: &Api<sr25519::Pair, WsRpcClient>,
 	last_synced_header: Header,
@@ -878,7 +886,7 @@ pub fn sync_parentchain<E: EnclaveBase + SideChain>(
 /// Execute trusted operations in the enclave
 ///
 ///
-fn execute_trusted_calls<E: SideChain>(enclave_api: &E) {
+fn execute_trusted_calls<E: Sidechain>(enclave_api: &E) {
 	if let Err(e) = enclave_api.execute_trusted_calls() {
 		error!("{:?}", e);
 	};

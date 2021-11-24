@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
 
 class HomeController extends Controller
 {
@@ -23,6 +24,10 @@ class HomeController extends Controller
      */
     public function index()
     {
-        return view('home');
+        $visitor = Tracker::currentSession();
+
+        //$users = Tracker::onlineUsers();
+        $users = "";
+        return view('home', ['users' => $visitor]);
     }
 }

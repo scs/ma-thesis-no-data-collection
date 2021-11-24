@@ -15,21 +15,18 @@
 
 */
 
-//! Extrinsic helpers for author RPC module.
+#[cfg(all(not(feature = "std"), feature = "sgx"))]
+use crate::sgx_reexport_prelude::*;
 
-use codec::{Decode, Encode};
-use ita_stf::TrustedOperation;
-use std::vec::Vec;
+use std::boxed::Box;
 
-/// RPC Trusted call or hash
-///
-/// Allows to refer to trusted calls either by its raw representation or its hash.
-#[derive(Debug, Encode, Decode)]
-pub enum TrustedOperationOrHash<Hash> {
-	/// The hash of the call.
-	Hash(Hash),
-	/// Raw extrinsic bytes.
-	OperationEncoded(Vec<u8>),
-	/// Raw extrinsic
-	Operation(TrustedOperation),
+pub type Result<T> = core::result::Result<T, Error>;
+
+/// nonce cache error
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("Nonce lock is poisoned")]
+	LockPoisoning,
+	#[error(transparent)]
+	Other(#[from] Box<dyn std::error::Error + Sync + Send + 'static>),
 }

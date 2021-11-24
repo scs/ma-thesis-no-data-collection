@@ -8,7 +8,7 @@ use codec::{alloc::string::String};
 
 //from tutorial (doc.rust.lang.org/book)
 
-use http_req::{request::{RequestBuilder,Method}, tls, uri::Uri, response::StatusCode, response};
+use http_req::{request::{RequestBuilder,Method}, tls, uri::Uri, response::StatusCode};
 //use std::ffi::CStr;
 //use std::ffi::CString;
 use std::net::TcpStream;
@@ -18,7 +18,7 @@ use std::net::TcpListener;
 use regex::Regex;
 //from tutorial (doc.rust.lang.org/book)
 use std::io::prelude::*;
-
+#[allow(dead_code)]
 pub fn start_tcp_listener(){
     	/*
 	

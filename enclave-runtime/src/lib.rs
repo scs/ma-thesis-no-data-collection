@@ -117,7 +117,6 @@ use substrate_api_client::{
 use std::io::Write;
 
 
-#[macro_use]
 extern crate lazy_static;
 mod mixnet;
 

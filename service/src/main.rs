@@ -279,7 +279,7 @@ fn my_func<E, T, D>(
 	T: GetTokioHandle,
 	E: EnclaveBase
 		+ DirectRequest
-		+ SideChain
+		+ Sidechain
 		+ RemoteAttestation
 		+ TlsRemoteAttestation
 		+ TeerexApi

@@ -167,7 +167,7 @@ impl Connection {
            mode: ServerMode,
            tls_session: rustls::ServerSession)
            -> Connection {
-        let back = open_back(&mode);
+        let back = open_back(&mode); // If Mode not Forward = None
         Connection {
             socket,
             token,
@@ -188,7 +188,7 @@ impl Connection {
         if ev.readiness().is_readable() {
             self.do_tls_read();
             self.try_plain_read();
-            self.try_back_read();
+            self.try_back_read(); // If Mode::Forward -> instant return
         }
 
         if ev.readiness().is_writable() {
@@ -196,8 +196,8 @@ impl Connection {
         }
 
         if self.closing {
-            let _ = self.socket.shutdown(Shutdown::Both);
-            self.close_back();
+            let _ = self.socket.shutdown(Shutdown::Both); // socket teardown
+            self.close_back(); // If Mode::Forward -> close this
             self.closed = true;
         } else {
             self.reregister(poll);
@@ -293,12 +293,14 @@ impl Connection {
     }
 
     /// Process some amount of received plaintext.
+    /// If we are here, we successfully 1. read some TLS data (do_tls_read) 2. and stored it in buf (try_plain_read)
     fn incoming_plaintext(&mut self, buf: &[u8]) {
         match self.mode {
             ServerMode::Echo => {
                 self.tls_session.write_all(buf).unwrap();
             }
-            ServerMode::Http => {
+            ServerMode::Http => { // TODO: put in here behaviour after a Request
+                self.print_incoming_data(buf);
                 self.send_http_response_once();
             }
             ServerMode::Forward(_) => {
@@ -306,15 +308,19 @@ impl Connection {
             }
         }
     }
+    fn print_incoming_data(&mut self, buf: &[u8]){
+        let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
+        println!("What I recieved: {}", request);
+    }
 
     fn send_http_response_once(&mut self) {
         let response = b"HTTP/1.0 200 OK\r\nConnection: close\r\n\r\nHello world from server\r\n";
-        if self.sent_http_response {
+        if !self.sent_http_response {
             self.tls_session
                 .write_all(response)
                 .unwrap();
             self.sent_http_response = true;
-            //self.tls_session.send_close_notify();
+            self.tls_session.send_close_notify();
             println!("Returned to client successfully!");
         } else {
             let my_str = "&email=userb@user.com&password=User1234";
@@ -441,8 +447,10 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 #[no_mangle]
 pub extern "C" fn run_server(max_conn: uint8_t) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
-    let cert = "end.fullchain";
-    let key = "end.rsa";
+    //let cert = "end.fullchain";
+    let cert = "localhost.crt"; // TODO: add it to the browser
+    //let key = "end.rsa";
+    let key = "localhost.key";
     //let mode = ServerMode::Echo;
     let mode = ServerMode::Http;
 

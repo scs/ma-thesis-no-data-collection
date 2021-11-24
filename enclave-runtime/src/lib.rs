@@ -32,6 +32,7 @@ extern crate sgx_tstd as std;
 #[cfg(not(feature = "test"))]
 use sgx_types::size_t;
 
+
 use crate::{
 	error::{Error, Result},
 	ocall::OcallApi,
@@ -88,6 +89,15 @@ use std::{slice, sync::Arc, vec::Vec};
 use substrate_api_client::{
 	compose_extrinsic_offline, extrinsic::xt_primitives::UncheckedExtrinsicV4,
 };
+
+use std::io::Write;
+
+
+extern crate lazy_static;
+mod mixnet;
+
+#[macro_use]
+extern crate log;
 
 mod attestation;
 mod ipfs;
@@ -266,6 +276,40 @@ pub unsafe extern "C" fn mock_register_enclave_xt(
 	std::mem::drop(nonce_lock);
 
 	write_slice_and_whitespace_pad(extrinsic_slice, xt);
+	sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn hello_world(		
+	some_string: *const u8,
+	len: usize,
+) -> sgx_status_t {
+	let str_slice = slice::from_raw_parts(some_string, len);
+	let _ = std::io::stdout().write(str_slice);
+	println!("{}", &str_slice[0]);
+	//let ne = String::from_utf8(str_slice).unwrap();
+	let rust_raw_string = "This is a in-Enclave";
+
+	let wor:[u8;4] = [82, 117, 115, 116];
+	
+	let word_vec:Vec<u8> = vec![32, 115, 116, 114, 105, 110, 103, 33];
+
+	let mut hello_string = String::from(rust_raw_string);
+
+	for c in wor.iter() { //use str_slice 
+		hello_string.push(*c as char);
+	}
+	hello_string += String::from_utf8(word_vec).expect("Invalid UTF-8").as_str();
+
+	println!("{}", &hello_string);
+	sgx_status_t::SGX_SUCCESS
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn login() -> sgx_status_t {
+	println!("[+] Entered Enclave");
+	mixnet::my_testing();
+	println!("[<-] Exiting enclave");
 	sgx_status_t::SGX_SUCCESS
 }
 

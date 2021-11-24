@@ -121,3 +121,5 @@ subcommands:
                     long: provisioning-client
                     help: Run TEE client for MU-RA key provisioning
                     takes_value: false
+    - mixnet: 
+        about:  Starting the MixNet Service

@@ -45,6 +45,7 @@ use itp_enclave_api::{
 	remote_attestation::{RemoteAttestation, TlsRemoteAttestation},
 	sidechain::Sidechain,
 	teerex_api::TeerexApi,
+	mixnet::MixNet,
 };
 use itp_settings::{
 	files::{
@@ -167,6 +168,39 @@ fn main() {
 			node_api,
 			tokio_handle,
 		);
+	} else if let Some(smatches) = matches.subcommand_matches("mixnet") {
+		let shard = extract_shard(&smatches, enclave.as_ref());
+
+		// Todo: Is this deprecated?? It is only used in remote attestation.
+		config.set_ext_api_url(
+			smatches
+				.value_of("w-server")
+				.map(ToString::to_string)
+				.unwrap_or_else(|| format!("ws://127.0.0.1:{}", config.worker_rpc_port)),
+		);
+
+		println!("Worker Config: {:?}", config);
+		let skip_ra = smatches.is_present("skip-ra");
+
+		let node_api = node_api_factory.create_api().set_signer(AccountKeyring::Alice.pair());
+		
+		GlobalWorker::reset_worker(Worker::new(
+			config.clone(),
+			node_api.clone(),
+			enclave.clone(),
+			DirectClient::new(config.worker_url()),
+		));
+		
+		
+		my_func(
+			config,
+			&shard,
+			enclave,
+			sidechain_blockstorage,
+			skip_ra,
+			node_api,
+			tokio_handle,
+		);
 	} else if let Some(smatches) = matches.subcommand_matches("request-keys") {
 		let shard = extract_shard(&smatches, enclave.as_ref());
 		let provider_url = smatches.value_of("provider").expect("provider must be specified");
@@ -230,7 +264,186 @@ fn main() {
 		println!("For options: use --help");
 	}
 }
+#[allow(clippy::too_many_arguments)]
+#[allow(dead_code)]
+//fn my_func<E>(	
+fn my_func<E, T, D>(
+	_config: Config,
+	shard: &ShardIdentifier,
+	enclave: Arc<E>,
+	_sidechain_storage: Arc<D>,
+	_skip_ra: bool,
+	mut _node_api: Api<sr25519::Pair, WsRpcClient>,
+	_tokio_handle: Arc<T>,
+) where
+	T: GetTokioHandle,
+	E: EnclaveBase
+		+ DirectRequest
+		+ SideChain
+		+ RemoteAttestation
+		+ TlsRemoteAttestation
+		+ TeerexApi
+		+ MixNet
+		+ Clone,
+	D: BlockPruner + Sync + Send + 'static,
+{
+	println!("IntegriTEE Worker v{}", VERSION);
+	info!("starting worker on shard {}", shard.encode().to_base58());
+	
+	// ------------------------------------------------------------------------
+	// check for required files
+	check_files();
+	// ------------------------------------------------------------------------
+	// initialize the enclave
+	println!("Initializing the enclave");
+	let mrenclave = enclave.get_mrenclave().unwrap();
+	println!("MRENCLAVE={}", mrenclave.to_base58());
 
+	/*
+	// ------------------------------------------------------------------------
+	// let new workers call us for key provisioning
+	println!("MU-RA server listening on ws://{}", config.mu_ra_url());
+	let ra_url = config.mu_ra_url();
+	let enclave_api_key_prov = enclave.clone();
+	thread::spawn(move || {
+		enclave_run_key_provisioning_server(
+			enclave_api_key_prov.as_ref(),
+			sgx_quote_sign_type_t::SGX_UNLINKABLE_SIGNATURE,
+			&ra_url,
+			skip_ra,
+		)
+	});
+
+	// ------------------------------------------------------------------------
+	// start worker api direct invocation server
+	let direct_invocation_server_addr = config.worker_url();
+	let enclave_for_direct_invocation = enclave.clone();
+	thread::spawn(move || {
+		println!(
+			"[+] RPC direction invocation server listening on wss://{}",
+			direct_invocation_server_addr
+		);
+		enclave_for_direct_invocation
+			.init_direct_invocation_server(direct_invocation_server_addr)
+			.unwrap();
+		println!("[+] RPC direction invocation server shut down");
+	});
+
+	// listen for sidechain_block import request. Later the `start_worker_api_direct_server`
+	// should be merged into this one.
+	let url = worker_url_into_async_rpc_url(&config.worker_url()).unwrap();
+
+	let handle = tokio_handle.get_handle();
+	let enclave_for_block_gossip_rpc_server = enclave.clone();
+	handle.spawn(async move {
+		itc_rpc_server::run_server(&url, enclave_for_block_gossip_rpc_server)
+			.await
+			.unwrap()
+	});
+	// ------------------------------------------------------------------------
+	// start the substrate-api-client to communicate with the node
+	let genesis_hash = node_api.genesis_hash.as_bytes().to_vec();
+
+	let tee_accountid = enclave_account(enclave.as_ref());
+	ensure_account_has_funds(&mut node_api, &tee_accountid);
+
+	// ------------------------------------------------------------------------
+	// perform a remote attestation and get an unchecked extrinsic back
+
+	// get enclaves's account nonce
+	let nonce = node_api.get_nonce_of(&tee_accountid).unwrap();
+	info!("Enclave nonce = {:?}", nonce);
+	enclave
+		.set_nonce(nonce)
+		.expect("Could not set nonce of enclave. Returning here...");
+
+	let uxt = if skip_ra {
+		println!(
+			"[!] skipping remote attestation. Registering enclave without attestation report."
+		);
+		enclave
+			.mock_register_xt(node_api.genesis_hash, nonce, &config.ext_api_url.unwrap())
+			.unwrap()
+	} else {
+		enclave
+			.perform_ra(genesis_hash, nonce, config.ext_api_url.unwrap().as_bytes().to_vec())
+			.unwrap()
+	};
+
+	let mut xthex = hex::encode(uxt);
+	xthex.insert_str(0, "0x");
+
+	// send the extrinsic and wait for confirmation
+	println!("[>] Register the enclave (send the extrinsic)");
+	let tx_hash = node_api.send_extrinsic(xthex, XtStatus::Finalized).unwrap();
+	println!("[<] Extrinsic got finalized. Hash: {:?}\n", tx_hash);
+
+	let last_synced_header = init_light_client(&node_api, enclave.as_ref());
+	println!("*** [+] Finished syncing light client\n");
+
+	
+	// ------------------------------------------------------------------------
+	// start interval block production (execution of trusted calls, sidechain block production)
+	let side_chain_enclave_api = enclave.clone();
+	thread::Builder::new()
+		.name("interval_block_production_timer".to_owned())
+		.spawn(move || start_interval_block_production(side_chain_enclave_api.as_ref()))
+		.unwrap();
+	
+	// ------------------------------------------------------------------------
+	// start parentchain syncing loop (subscribe to header updates)
+	let api4 = node_api.clone();
+	let parentchain_sync_enclave_api = enclave.clone();
+	thread::Builder::new()
+		.name("parent_chain_sync_loop".to_owned())
+		.spawn(move || {
+			if let Err(e) = subscribe_to_parentchain_new_headers(
+				parentchain_sync_enclave_api.as_ref(),
+				&api4,
+				last_synced_header,
+			) {
+				error!("Parentchain block syncing terminated with a failure: {:?}", e);
+			}
+			println!("[+] Parentchain block syncing has terminated");
+		})
+		.unwrap();
+
+	//-------------------------------------------------------------------------
+	// start execution of trusted getters
+	let trusted_getters_enclave_api = enclave;
+	thread::Builder::new()
+		.name("trusted_getters_execution".to_owned())
+		.spawn(move || {
+			start_interval_trusted_getter_execution(trusted_getters_enclave_api.as_ref())
+		})
+		.unwrap();
+
+	// ------------------------------------------------------------------------
+	// start sidechain pruning loop
+	thread::Builder::new()
+		.name("sidechain_pruning_loop".to_owned())
+		.spawn(move || {
+			sidechain_storage::start_sidechain_pruning_loop(
+				&sidechain_storage,
+				SIDECHAIN_PURGE_INTERVAL,
+				SIDECHAIN_PURGE_LIMIT,
+			);
+		})
+		.unwrap();
+		*/
+
+
+	/* Added Code 
+	println!("Testing simple helloworld function");
+	let input_string = String::from("This string is passed into Enclave \n");
+	enclave.hello_world(input_string.as_ptr() as * const u8,
+						input_string.len()
+	).unwrap();
+	println!("[+] hello world in enclave was a success");
+	*/
+	enclave.login().unwrap();
+
+}
 /// FIXME: needs some discussion (restructuring?)
 #[allow(clippy::too_many_arguments)]
 fn start_worker<E, T, D>(

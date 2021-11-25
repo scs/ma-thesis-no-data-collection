@@ -307,9 +307,7 @@ pub unsafe extern "C" fn hello_world(
 
 #[no_mangle]
 pub unsafe extern "C" fn login() -> sgx_status_t {
-	println!("[+] Entered Enclave");
 	mixnet::my_testing();
-	println!("[<-] Exiting enclave");
 	sgx_status_t::SGX_SUCCESS
 }
 

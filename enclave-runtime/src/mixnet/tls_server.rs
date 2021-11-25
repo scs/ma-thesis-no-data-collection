@@ -252,7 +252,7 @@ impl Connection {
     fn try_plain_read(&mut self) {
         // Read and process all available plaintext.
         let mut buf = Vec::new();
-
+        
         let rc = self.tls_session.read_to_end(&mut buf);
         if rc.is_err() {
             error!("plaintext read failed: {:?}", rc);
@@ -315,45 +315,45 @@ impl Connection {
         }
     }
 
+    fn create_body(&mut self, buf: &[u8], body_offset: usize) -> HashMap<&String, &String> {
+        let mut body_map: HashMap<&String, &String> = HashMap::new();
+        /*
+        if body_offset < buf.len(){ // only Converting if there is something to do
+            let body_slice = &buf[body_offset..];
+            let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
+            let it = body_str.split("&");
+            for i in it {
+                let kv:Vec<&str> = i.split("=").collect();
+                let k = kv[0].to_string();
+                let v = String::from(kv[1]);
+                body_map.insert(&k,&v);
+            }
+        }*/
+        body_map
+    }
+
     fn handle_request(&mut self, buf: &[u8]){
         //let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
         //println!("What I recieved: {}", request);
-        let mut headers = [httparse::EMPTY_HEADER; 50];
+        let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = Request::new(&mut headers);
         let res = req.parse(buf).unwrap();
         if res.is_complete(){
-            match req.path {
+            let res = match req.path {
                 Some(ref path) => {
-                    let body_offset = res.unwrap();
-                    let body_slice = &buf[body_offset..];
-                    let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
-                    println!("Body: {}", body_str);
-                    //println!("Parsed: {:?}", req);
-                    println!("path: {}", path);
-                    // check router for path
-
-                    let router = router::load_all_routes();
+                    let body_map = self.create_body(buf, res.unwrap());
                     
+                    //println!("Parsed: {:?}", req.headers());
+                    let body_str = String::from("");
 
-                    match router.recognize(path) {
-                        Ok(match_t) => {
-                            //println!("Found Path");
-                            let handler = match_t.handler();
-                            let res = handler.as_ref().unwrap();
-                            //println!("{}", res);
-                            self.send_response(res.to_string());
-                        },
-                        Err(e) => {
-                            println!("Error: {}", e);
-                            let res = router::not_found().unwrap();
-                            self.send_response(res);
-                        }
-                    }
+                    // check router for path
+                    router::handle_routes(path, body_str).unwrap()
                 },
                 None => {
-                    let res = router::not_found().unwrap();
-                    self.send_response(res);                }
-            }
+                    router::not_found().unwrap()            
+                }
+            };
+            self.send_response(res);
         }
     }
     fn send_response(&mut self, response: String){

@@ -1,22 +1,33 @@
 pub use route_recognizer::{Router, Params};
 use itp_sgx_io as io;
 use sgx_tstd as std;
-
+use crate::mixnet::proxy; 
 const STATUS_LINE_OK: &str = "HTTP/1.1 200 OK";
 const STATUS_LINE_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
 
 //use codec::{alloc::string::String};
 use std::{
 	string::{
-        /*ToString,*/ 
+        ToString, 
         String,
     },
     //vec::Vec,
     io::{Result as IOResult}
-}; 
-pub fn load_all_routes() -> Router<IOResult<String>> {
+};
+
+#[derive(Debug)]
+pub struct Request<'a> {
+    pub map: &'a Params,
+    pub data: String,
+}
+
+pub fn load_all_routes() -> Router<String> {
     let mut router = Router::new();
-    router.add("/", index());
+    router.add("/", "index".to_string());
+    router.add("/proxy/:service/", "proxy_wo_route".to_string());
+    router.add("/proxy/:service/*route", "proxy".to_string());
+    //router.add("/proxy/:service", "proxy".to_string());
+    //router.add("/proxy/:service/*route", "proxy".to_string());
     /*
     router.add("/tom", "Tom".to_string());
     router.add("/wycats", "Yehuda".to_string());
@@ -24,8 +35,38 @@ pub fn load_all_routes() -> Router<IOResult<String>> {
     router
 }
 
+pub fn handle_routes(path: &str, body: String)->IOResult<String>{
+    let router = load_all_routes();
+    match router.recognize(path) {
+        Ok(route_match) => {
+            //println!("DEBUG: {:?}", route_match);
+            let req = Request {
+                map: route_match.params(),
+                data: body,
+            };
+
+            match route_match.handler().as_str() {
+                "index" => index(),
+                "proxy" => proxy(req, true),
+                "proxy_wo_route" => proxy(req, false),
+                _ => not_found(),
+            }
+        },
+        Err(e) => {
+            println!("Error: {}", e);
+            not_found()
+        }
+    }
+
+}  
+
 pub fn index()->IOResult<String>{
     let contents = get_file_contents("index").unwrap();
+    prepare_response(STATUS_LINE_OK, contents)
+}
+
+pub fn proxy(request: Request, has_route: bool)->IOResult<String>{
+    let contents = proxy::forward_and_return_request(&request, has_route).unwrap();
     prepare_response(STATUS_LINE_OK, contents)
 }
 

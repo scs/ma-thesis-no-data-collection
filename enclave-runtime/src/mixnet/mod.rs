@@ -18,10 +18,11 @@
 pub mod tls_server;
 //pub mod tls_server_client;
 pub mod test_http;
-//pub mod proxy;
+pub mod proxy;
 pub mod router;
 
 pub const BASE_URL: &str = "127.0.0.1:8443"; 
+pub const HTTPS_BASE_URL: &str = "https://localhost:8443"; 
 pub const TARGET_URL: &str = "https://test.benelli.dev";
 
 pub fn my_testing(){

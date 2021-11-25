@@ -78,7 +78,7 @@ fn handle_connection(mut stream: TcpStream) {
 		/*
 		println!("[->] ... replacing urls");
 
-		let re = Regex::new("(?:(?:ht|f)tp(?:s?)://|~/|/)?test.benelli.dev").unwrap(); 
+		let re = Regex::new("(?:(?:ht|f)tp(?:s?)://|~/|/)?tst.benelli.dev").unwrap(); 
 		//let replaced_body = re.captures(&body_new).unwrap();
 		let contents = re.replace_all(&contents, "localhost:8000/targetservice").to_string();
 		//println!("{:?}",replaced_body);

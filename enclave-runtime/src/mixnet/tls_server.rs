@@ -318,7 +318,7 @@ impl Connection {
     fn handle_request(&mut self, buf: &[u8]){
         //let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
         //println!("What I recieved: {}", request);
-        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut headers = [httparse::EMPTY_HEADER; 50];
         let mut req = Request::new(&mut headers);
         let res = req.parse(buf).unwrap();
         if res.is_complete(){
@@ -336,20 +336,30 @@ impl Connection {
                     
 
                     match router.recognize(path) {
-                        Ok(ref hand) => {
-                            
+                        Ok(match_t) => {
+                            //println!("Found Path");
+                            let handler = match_t.handler();
+                            let res = handler.as_ref().unwrap();
+                            //println!("{}", res);
+                            self.send_response(res.to_string());
                         },
                         Err(e) => {
-
+                            println!("Error: {}", e);
+                            let res = router::not_found().unwrap();
+                            self.send_response(res);
                         }
                     }
                 },
                 None => {
-                    // error
-                }
+                    let res = router::not_found().unwrap();
+                    self.send_response(res);                }
             }
         }
-        self.send_http_response_once();
+    }
+    fn send_response(&mut self, response: String){
+        self.tls_session
+            .write_all(response.as_bytes())
+            .unwrap();
     }
 
     fn send_http_response_once(&mut self) {

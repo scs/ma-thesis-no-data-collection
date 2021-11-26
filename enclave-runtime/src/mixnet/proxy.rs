@@ -3,7 +3,7 @@ use itp_sgx_io as io;
 use sgx_tstd as std;
 
 use crate::mixnet::router;
-use router::Request;
+use router::RouterRequest;
 
 use http_req::{request::RequestBuilder, tls, uri::Uri};
 use std::net::TcpStream;
@@ -15,7 +15,7 @@ use std::{
     vec::Vec,
     io::{Result as IOResult}
 };
-use std::io::prelude::*;
+//use std::io::prelude::*;
 
 use regex::Regex;
 
@@ -23,7 +23,7 @@ use crate::mixnet::{HTTPS_BASE_URL};
 
 
 
-pub fn forward_and_return_request(req: & Request, has_route: bool) -> IOResult<String> {
+pub fn forward_and_return_request(req: & RouterRequest, has_route: bool) -> IOResult<String> {
     let target = &req.map["service"];
     let route = if has_route {
         &req.map["route"]
@@ -70,6 +70,7 @@ pub fn send_http_request(hostname: String) -> IOResult<String>{
 
     let res_str = String::from_utf8(writer).expect("Invalid Response from host");
     //println!("Response: {:?}", response);
+    //println!("DEBUG res_str: {}", res_str);
     Ok(res_str)
 }
 

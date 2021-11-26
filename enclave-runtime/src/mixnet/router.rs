@@ -5,6 +5,7 @@ use crate::mixnet::proxy;
 const STATUS_LINE_OK: &str = "HTTP/1.1 200 OK";
 const STATUS_LINE_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
 
+use crate::mixnet::tls_server::Request as ParsedRequest;
 //use codec::{alloc::string::String};
 use std::{
 	string::{
@@ -16,7 +17,7 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct Request<'a> {
+pub struct RouterRequest<'a> {
     pub map: &'a Params,
     pub data: String,
 }
@@ -35,14 +36,14 @@ pub fn load_all_routes() -> Router<String> {
     router
 }
 
-pub fn handle_routes(path: &str, body: String)->IOResult<String>{
+pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<String>{
     let router = load_all_routes();
     match router.recognize(path) {
         Ok(route_match) => {
             //println!("DEBUG: {:?}", route_match);
-            let req = Request {
+            let req = RouterRequest {
                 map: route_match.params(),
-                data: body,
+                data: String::from(""),
             };
 
             match route_match.handler().as_str() {
@@ -65,7 +66,7 @@ pub fn index()->IOResult<String>{
     prepare_response(STATUS_LINE_OK, contents)
 }
 
-pub fn proxy(request: Request, has_route: bool)->IOResult<String>{
+pub fn proxy(request: RouterRequest, has_route: bool)->IOResult<String>{
     let contents = proxy::forward_and_return_request(&request, has_route).unwrap();
     prepare_response(STATUS_LINE_OK, contents)
 }

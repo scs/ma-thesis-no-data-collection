@@ -31,6 +31,15 @@ use std::net::Shutdown;
 use crate::mixnet::{BASE_URL};
 use crate::mixnet::router;
 
+pub struct Request<'a> {
+    pub method: Option<&'a str>,
+    pub path: Option<&'a str>,
+    pub version: Option<u8>,
+    pub headers: HashMap<String, String>,
+    pub body: HashMap<String, String>,
+}
+
+
 extern crate webpki;
 extern crate rustls;
 extern crate mio;
@@ -43,7 +52,7 @@ use codec::{alloc::string::String};
 use std::{
 	string::ToString,
 };
-use httparse::*;
+//use httparse::*;
 
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
@@ -315,9 +324,7 @@ impl Connection {
         }
     }
 
-    fn create_body(&mut self, buf: &[u8], body_offset: usize) -> HashMap<&String, &String> {
-        let mut body_map: HashMap<&String, &String> = HashMap::new();
-        /*
+    fn create_request_body(&mut self, buf: &[u8], body_offset: usize, body_to_fill: &mut HashMap<String, String>) {
         if body_offset < buf.len(){ // only Converting if there is something to do
             let body_slice = &buf[body_offset..];
             let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
@@ -326,36 +333,55 @@ impl Connection {
                 let kv:Vec<&str> = i.split("=").collect();
                 let k = kv[0].to_string();
                 let v = String::from(kv[1]);
-                body_map.insert(&k,&v);
+                body_to_fill.insert(k,v);
             }
-        }*/
-        body_map
+            
+        }
+    }
+
+    fn parse_request<'a>(&'a mut self, buf: &'a [u8])->Result<Request, String>{
+        let mut headers = [httparse::EMPTY_HEADER; 64];
+        let mut req = httparse::Request::new(&mut headers);
+        let res = req.parse(buf).unwrap();
+        if res.is_complete(){
+            let mut parsed_req = Request {
+                method: req.method,
+                path: req.path,
+                version: req.version,
+                headers: HashMap::<String,String>::new(),
+                body: HashMap::<String,String>::new(),
+            };
+            for i in 0..req.headers.len() {
+                let h = req.headers[i];
+                parsed_req.headers.insert(h.name.to_string(), String::from_utf8(h.value.to_vec()).expect("Header error"));
+            }
+            self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
+            Ok(parsed_req)
+        } else {
+            Err(String::from("Request was invalid"))
+        }
     }
 
     fn handle_request(&mut self, buf: &[u8]){
-        //let request = String::from_utf8(buf.to_vec()).expect("invalid encoding in request");
-        //println!("What I recieved: {}", request);
-        let mut headers = [httparse::EMPTY_HEADER; 64];
-        let mut req = Request::new(&mut headers);
-        let res = req.parse(buf).unwrap();
-        if res.is_complete(){
-            let res = match req.path {
-                Some(ref path) => {
-                    let body_map = self.create_body(buf, res.unwrap());
-                    
-                    //println!("Parsed: {:?}", req.headers());
-                    let body_str = String::from("");
-
-                    // check router for path
-                    router::handle_routes(path, body_str).unwrap()
-                },
-                None => {
-                    router::not_found().unwrap()            
+        let res = match self.parse_request(&buf) {
+            Ok(req) => {
+                match req.path {
+                    Some(ref path) => {
+                        router::handle_routes(path, req).unwrap()
+                    },
+                    None => {
+                        router::not_found().unwrap()            
+                    }
                 }
-            };
-            self.send_response(res);
-        }
+            },
+            Err(m) => {
+                debug!("[Enclave-TLS-Server-Parsing]: {}", m);
+                router::not_found().unwrap() 
+            } 
+        };
+        self.send_response(res);
     }
+    
     fn send_response(&mut self, response: String){
         self.tls_session
             .write_all(response.as_bytes())

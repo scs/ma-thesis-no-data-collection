@@ -55,6 +55,9 @@ pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<String>{
         },
         Err(e) => {
             println!("Error: {}", e);
+            if parsed_req.headers.contains_key("Referer") {
+                println!("Coming from: {}", parsed_req.headers["Referer"]);
+            }
             not_found()
         }
     }

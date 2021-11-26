@@ -19,7 +19,7 @@ use std::{
 #[derive(Debug)]
 pub struct RouterRequest<'a> {
     pub map: &'a Params,
-    pub data: String,
+    pub data: ParsedRequest<'a>,
 }
 
 pub fn load_all_routes() -> Router<String> {
@@ -43,7 +43,7 @@ pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<String>{
             //println!("DEBUG: {:?}", route_match);
             let req = RouterRequest {
                 map: route_match.params(),
-                data: String::from(""),
+                data: parsed_req,
             };
 
             match route_match.handler().as_str() {

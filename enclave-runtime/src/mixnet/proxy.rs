@@ -1,4 +1,4 @@
-use itp_sgx_io as io;
+//use itp_sgx_io as io;
 
 use sgx_tstd as std;
 
@@ -30,7 +30,7 @@ pub fn forward_and_return_request(req: & RouterRequest, has_route: bool) -> IORe
     } else { "" };
     println!("Targeting: {} and route {}", target, route);
     // get session token
-    let addr: Uri = target.parse().unwrap();
+    //let addr: Uri = target.parse().unwrap();
     //println!("parsed address: {:?}", addr);
     let mut https_url = String::from("https://");
     https_url += target;
@@ -63,12 +63,14 @@ pub fn send_http_request(hostname: String) -> IOResult<String>{
     let mut writer = Vec::new();
 
     //Add header `Connection: Close`
-    let response = RequestBuilder::new(&addr)
+    let _response = RequestBuilder::new(&addr)
         .header("Connection", "Close")
         .send(&mut stream, &mut writer)
         .unwrap();
 
     let res_str = String::from_utf8(writer).expect("Invalid Response from host");
+    // Handle Response Code -> 301 retry with new location
+    // If content
     //println!("Response: {:?}", response);
     //println!("DEBUG res_str: {}", res_str);
     Ok(res_str)
@@ -82,7 +84,7 @@ pub fn clean_urls(content: & String, target_url: & String) -> IOResult<String> {
     replace_with += &String::from("/proxy/");
     replace_with += target_url;
 
-    println!("Regexstring: {} and replace it with: {}", regex_string, replace_with);
+    //println!("Regexstring: {} and replace it with: {}", regex_string, replace_with);
     //println!("{:?}",content);
     let content = re.replace_all(&content, replace_with.as_str());
     //println!("{:?}",content);

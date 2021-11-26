@@ -31,6 +31,7 @@ use std::net::Shutdown;
 use crate::mixnet::{BASE_URL};
 use crate::mixnet::router;
 
+#[derive(Debug)]
 pub struct Request<'a> {
     pub method: Option<&'a str>,
     pub path: Option<&'a str>,
@@ -381,7 +382,7 @@ impl Connection {
         };
         self.send_response(res);
     }
-    
+
     fn send_response(&mut self, response: String){
         self.tls_session
             .write_all(response.as_bytes())

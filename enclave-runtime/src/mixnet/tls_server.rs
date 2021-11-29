@@ -38,8 +38,9 @@ pub struct Request<'a> {
     pub version: Option<u8>,
     pub headers: HashMap<String, String>,
     pub body: HashMap<String, String>,
+    pub target: Option<String>,
 }
-
+use regex::Regex;
 
 extern crate webpki;
 extern crate rustls;
@@ -120,7 +121,6 @@ impl TlsServer {
 
     fn conn_event(&mut self, poll: &mut mio::Poll, event: &mio::event::Event) {
         let token = event.token();
-
         if self.connections.contains_key(&token) {
             self.connections
                 .get_mut(&token)
@@ -351,10 +351,22 @@ impl Connection {
                 version: req.version,
                 headers: HashMap::<String,String>::new(),
                 body: HashMap::<String,String>::new(),
+                target: None,
             };
-            for i in 0..req.headers.len() {
+            for i in 0..req.headers.len() { // Adding Headers to Hasmap
                 let h = req.headers[i];
-                parsed_req.headers.insert(h.name.to_string(), String::from_utf8(h.value.to_vec()).expect("Header error"));
+                let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
+                parsed_req.headers.insert(h.name.to_string(), value);
+            }
+            
+            if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
+                let cookie = parsed_req.headers.get("Cookie").unwrap();
+                let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
+                let target = match cookie_re.captures(cookie.as_str()) {
+                    Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                    _ => None,
+                };
+                parsed_req.target = target;
             }
             self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
             Ok(parsed_req)
@@ -544,6 +556,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
     let mut tlsserv = TlsServer::new(listener, mode, config);
 
     let mut events = mio::Events::with_capacity(256);
+    println!("[+] Server in Enclave is Listening now");
     'outer: loop {
         poll.poll(&mut events, None)
             .unwrap();

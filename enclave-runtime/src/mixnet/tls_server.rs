@@ -335,7 +335,9 @@ impl Connection {
                 let kv:Vec<&str> = i.split("=").collect();
                 let k = kv[0].to_string();
                 let v = String::from(kv[1]);
-                body_to_fill.insert(k,v);
+                if v!=String::from(""){
+                    body_to_fill.insert(k,v);
+                }
             }
             
         }

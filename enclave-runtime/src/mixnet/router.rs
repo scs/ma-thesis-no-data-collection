@@ -65,7 +65,13 @@ pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
             }
         },
         Some(_target) => {
-            proxy(parsed_req)
+            if parsed_req.auth {
+                println!("Need to check authentication here and change method for proxy");
+                proxy(parsed_req)
+            } else {
+                proxy(parsed_req)
+
+            }
         }
     }
 

@@ -1,10 +1,7 @@
 //use itp_sgx_io as io;
-
 use sgx_tstd as std;
-
 //use crate::mixnet::router;
 use crate::mixnet::tls_server::Request;
-
 use http_req::{request::RequestBuilder, tls, uri::Uri, response::{Response, Headers}};
 //use http_req::response::Headers;
 use std::net::TcpStream;
@@ -16,12 +13,58 @@ use std::{
     vec::Vec,
     io::{Result as IOResult},
     borrow::ToOwned,
-    
 };
 //use std::io::prelude::*;
 use regex::Regex;
-
 use crate::mixnet::{HTTPS_BASE_URL};
+use std::collections::HashMap;
+use std::sync::SgxMutex as Mutex;
+use sgx_rand as rand;
+use rand::{Rng};
+
+
+#[derive(Clone,Debug)]
+pub struct Domain{
+    pub uri: Uri,
+    pub cookie_name: String,
+    pub cookies: Vec<String>,
+}
+lazy_static! {
+    static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
+        let mut m = HashMap::new();
+        m.insert(String::from("test.benelli.dev"), Domain{
+            uri: "https://test.benelli.dev".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: vec![String::from("target_service_session=eyJpdiI6Ijk5OFRza3FxQnhJYkJKcEROazZkRXc9PSIsInZhbHVlIjoiZytoNVhORXFOUnk2SXgybmhVQlJ1Z3p4dDNvbUM3QnUrdGkzbm5DT0o5eDZnSzRaQjJUbC82RWhJbnhMUGdpUTVnMWptQThZMGUycW9kQ2M0RDV5ZWU0WHFOb0pNd3g2b1FFazBHbkh3YktZdXlkdkE0UHN1WW1xSUIzQXRNeWwiLCJtYWMiOiJiMTlmOTQ3NDg1OWYwOWNhM2MyN2NlNzgzZWFiNjEzZDIxMzI1NTMxNzYzNTQ3ZWVjZjg5OTY2ZDMzM2RlODI0IiwidGFnIjoiIn0%3D"), String::from("target_service_session=eyJpdiI6InZsNzBZZDZhZk9TS2ZGSEJrZ1l2YVE9PSIsInZhbHVlIjoiZFpXM0pld2xuUUlmVDRacnNsMUtzcGhGN2IzeWQ1VTJJWUNia0liZG5yY0dSRERQeTN1TExEZE1hWEFMdDkxbzBxUHh5cnFOOE5tb1BxNVFJZ3lVYmo1SHl0YnVCZGlOeUYxK01ZTERORXpiamNRMEpxTzdSNHFmUjh5Q0lUYUQiLCJtYWMiOiI2NWM5MWQ5MjkxZDVjZjgwOWVmNDgyN2UyYWI3MmEzYTE0MGM4MTYxODRjYWNmZDdlZTQ3Y2U0NzYxZmNlOWQzIiwidGFnIjoiIn0%3D")],
+        });
+        m.insert(String::from("www.blick.ch"), Domain{
+            uri: "https://www.blick.ch".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: Vec::new(),
+        });
+        m.insert(String::from("www.tagesanzeiger.ch"), Domain{
+            uri: "https://www.tagesanzeiger.ch".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: Vec::new(),
+        });
+        m.insert(String::from("www.nzz.ch"), Domain{
+            uri: "https://www.nzz.ch".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: Vec::new(),
+        });
+        m.insert(String::from("www.republik.ch"), Domain{
+            uri: "https://www.republik.ch".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: Vec::new(),
+        });
+        m.insert(String::from("www.watson.ch"), Domain{
+            uri: "https://www.watson.ch".parse().unwrap(),
+            cookie_name: String::from("hello"),
+            cookies: Vec::new(),
+        });
+       Mutex::new(m)
+    };
+}
 
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
     let https_url = create_https_url_from_target_and_route(req);
@@ -111,7 +154,6 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
     let port: u16 = 443;
     //Construct a domain:ip string for tcp connection
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-    //println!("Addr: {:?}", conn_addr);
     //Connect to remote host
     let stream = TcpStream::connect(conn_addr).unwrap();
     //Open secure connection over TlsStream, because of `addr` (https)
@@ -120,15 +162,28 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
         .unwrap();
     //Container for response's body
     let mut writer = Vec::new();
-    //Add header `Connection: Close`
-    println!("DEBUG Method: {:?} \n Body: {:?}", req.method, req.body);
+    println!("More Debug: auth: {:?}, path: {:?} ", &req.auth, &req.path);
     let response = RequestBuilder::new(&addr)
         .header("Connection", "Keep-Alive")
-        .header("Cookie", "connect.sid=s:IZCMqmHa17cQr6JySQDwCv5U8cyH32d_.Jl3L3UhZQ9dbkju51eeDsOCDo8AfCbAUsl1S2eASTjs; Domain=republik.ch; Path=/; Expires=Wed, 30 Nov 2022 15:38:19 GMT; HttpOnly; Secure; SameSite=None")
+        .header("Cookie", &get_random_cookie(&req))
         .send(&mut stream, &mut writer)
         .unwrap();
     Ok((response, writer))
 }
+pub fn get_random_cookie(req: & Request) -> String {
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+    //target_domain.cookies.push(String::from("hello"));
+    let cookies = &target_domain.cookies;
+    if cookies.len()>0 {
+        let index = rand::thread_rng().gen_range(0, cookies.len());
+        String::from(&cookies[index])
+    } else {String::from("")}
+
+    //String::from("s: &str")
+    //target_domain.cookies.choose(& mut thread_rng())
+}
+
 
 pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
     let target_url =  req.target.as_ref().unwrap();    
@@ -144,7 +199,7 @@ pub fn add_base_tag(content: & String) -> IOResult<String> {
     let regex = Regex::new("(?i)<head>").unwrap();
     let mut replace_with = String::from("<head> \n <base href=\"");
     replace_with += HTTPS_BASE_URL;
-    replace_with += &String::from("\"/> <meta charset=\"utf-8\">");
+    replace_with += &String::from("/\"/> <meta charset=\"utf-8\">");
     replace_with += &get_logout_script();
     //println!("Regexstring: {} and replace it with: {}", regex, replace_with);
 

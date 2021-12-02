@@ -31,7 +31,7 @@ use std::net::Shutdown;
 use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
 use crate::mixnet::router;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Request<'a> {
     pub method: Option<&'a str>,
     pub path: Option<&'a str>,
@@ -39,6 +39,7 @@ pub struct Request<'a> {
     pub headers: HashMap<String, String>,
     pub body: HashMap<String, String>,
     pub target: Option<String>,
+    pub auth: bool,
 }
 use regex::Regex;
 
@@ -352,6 +353,7 @@ impl Connection {
                 headers: HashMap::<String,String>::new(),
                 body: HashMap::<String,String>::new(),
                 target: None,
+                auth: false
             };
             for i in 0..req.headers.len() { // Adding Headers to Hasmap
                 let h = req.headers[i];
@@ -367,8 +369,11 @@ impl Connection {
                     _ => None,
                 };
                 parsed_req.target = target;
+                parsed_req.auth = cookie.contains("proxy-auth")
             }
             self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
+            //set auth
+            parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
             Ok(parsed_req)
         } else {
             Err(String::from("Request was invalid"))

@@ -25,6 +25,8 @@
         let expires = "expires="+ d.toUTCString();
         document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
       }
+
+
     </script>
   </head>
   <style>
@@ -74,12 +76,20 @@
         <option value="test.benelli.dev">test-service</option>
         <option value="www.blick.ch">blick.ch</option>
         <option value="www.tagesanzeiger.ch">tagesanzeiger.ch</option>
+        <option value="www.nzz.ch">nzz.ch</option>
+        <option value="www.republik.ch">republik.ch</option>
+        <option value="www.watson.ch">watson.ch</option>
+
+
+
         </select>
     </div>
     <div class="center">
       <form id='form_id' action="/" method='post'>
         <input name="username" id="username" type="text" placeholder="Username" required>
         <input name="password" id="password" type="password" placeholder="Password" required>
+        <p style="margin: 0px;">or</p>
+        <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
         <div style="width: 322px;">
           <input type='button' value='Login' onclick="myfunction()"/>
         </div>

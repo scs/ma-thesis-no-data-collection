@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::net;
 use std::net::Shutdown;
 
-use crate::mixnet::{BASE_URL};
+use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
 use crate::mixnet::router;
 
 #[derive(Debug)]
@@ -395,9 +395,9 @@ impl Connection {
         self.send_response(res);
     }
 
-    fn send_response(&mut self, response: String){
+    fn send_response(&mut self, response: Vec<u8>){
         self.tls_session
-            .write_all(response.as_bytes())
+            .write_all(&response)
             .unwrap();
     }
 
@@ -556,7 +556,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
     let mut tlsserv = TlsServer::new(listener, mode, config);
 
     let mut events = mio::Events::with_capacity(256);
-    println!("[+] Server in Enclave is Listening now");
+    println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
         poll.poll(&mut events, None)
             .unwrap();

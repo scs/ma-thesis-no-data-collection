@@ -35,7 +35,7 @@ lazy_static! {
         m.insert(String::from("test.benelli.dev"), Domain{
             uri: "https://test.benelli.dev".parse().unwrap(),
             cookie_name: String::from("hello"),
-            cookies: vec![String::from("target_service_session=eyJpdiI6Ijk5OFRza3FxQnhJYkJKcEROazZkRXc9PSIsInZhbHVlIjoiZytoNVhORXFOUnk2SXgybmhVQlJ1Z3p4dDNvbUM3QnUrdGkzbm5DT0o5eDZnSzRaQjJUbC82RWhJbnhMUGdpUTVnMWptQThZMGUycW9kQ2M0RDV5ZWU0WHFOb0pNd3g2b1FFazBHbkh3YktZdXlkdkE0UHN1WW1xSUIzQXRNeWwiLCJtYWMiOiJiMTlmOTQ3NDg1OWYwOWNhM2MyN2NlNzgzZWFiNjEzZDIxMzI1NTMxNzYzNTQ3ZWVjZjg5OTY2ZDMzM2RlODI0IiwidGFnIjoiIn0%3D"), String::from("target_service_session=eyJpdiI6InZsNzBZZDZhZk9TS2ZGSEJrZ1l2YVE9PSIsInZhbHVlIjoiZFpXM0pld2xuUUlmVDRacnNsMUtzcGhGN2IzeWQ1VTJJWUNia0liZG5yY0dSRERQeTN1TExEZE1hWEFMdDkxbzBxUHh5cnFOOE5tb1BxNVFJZ3lVYmo1SHl0YnVCZGlOeUYxK01ZTERORXpiamNRMEpxTzdSNHFmUjh5Q0lUYUQiLCJtYWMiOiI2NWM5MWQ5MjkxZDVjZjgwOWVmNDgyN2UyYWI3MmEzYTE0MGM4MTYxODRjYWNmZDdlZTQ3Y2U0NzYxZmNlOWQzIiwidGFnIjoiIn0%3D")],
+            cookies: Vec::new(),
         });
         m.insert(String::from("www.blick.ch"), Domain{
             uri: "https://www.blick.ch".parse().unwrap(),
@@ -128,26 +128,6 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     //Ok(body)
 }
 
-pub fn prepare_response(status_line: String, headers: Headers, mut contents: Vec<u8>) ->  IOResult<Vec<u8>>{
-    //println!("{:?}", status_line);
-    //let status_line = format!("{} {} {}", status.version(), status.code.as_u16(), status.reason());
-    //let status_line = "HTTP/1.1 200 OK";
-    let mut addional_headers = "".to_owned(); //"Location: https://www.blick.ch/ \r\n";
-    for (key, value) in headers.iter() {
-        addional_headers += format!("{}:{} \r\n", key, value).as_str();
-    };
-    let response_string = format!(
-        "{}\r\n{}Content-Length: {}\r\n\r\n",
-        status_line,
-        addional_headers,
-        contents.len(),
-    );
-    //println!("Sending response: {:?}", response_string);
-    //response_string = format!("{}\r\nLocation: https://localhost:8443 \r\n\r\n", response_string);
-    let mut response = response_string.as_bytes().to_vec();
-    response.append(&mut contents);
-    Ok(response)
-}
 
 pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response, Vec<u8>)>{
     let addr: Uri = hostname.parse().unwrap();
@@ -162,7 +142,7 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
         .unwrap();
     //Container for response's body
     let mut writer = Vec::new();
-    println!("More Debug: auth: {:?}, path: {:?} ", &req.auth, &req.path);
+    //println!("More Debug: auth: {:?}, path: {:?} ", &req.auth, &req.path);
     let response = RequestBuilder::new(&addr)
         .header("Connection", "Keep-Alive")
         .header("Cookie", &get_random_cookie(&req))
@@ -184,6 +164,19 @@ pub fn get_random_cookie(req: & Request) -> String {
     //target_domain.cookies.choose(& mut thread_rng())
 }
 
+pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
+    insert_cookie_to_target(&req, cookie);
+    true
+}
+
+pub fn insert_cookie_to_target(req: & Request, cookie: String){
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+    //target_domain.cookies.push(String::from("hello"));
+    println!("{} will be inserted to {:?}", cookie, target_domain);
+    target_domain.cookies.push(cookie);
+    println!("Vector now {:?}",  target_domain);
+}
 
 pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
     let target_url =  req.target.as_ref().unwrap();    
@@ -222,4 +215,25 @@ pub fn get_logout_script() -> String {
       }
       </script>";
     format!("{}{}", style, script)
+}
+
+pub fn prepare_response(status_line: String, headers: Headers, mut contents: Vec<u8>) ->  IOResult<Vec<u8>>{
+    //println!("{:?}", status_line);
+    //let status_line = format!("{} {} {}", status.version(), status.code.as_u16(), status.reason());
+    //let status_line = "HTTP/1.1 200 OK";
+    let mut addional_headers = "".to_owned(); //"Location: https://www.blick.ch/ \r\n";
+    for (key, value) in headers.iter() {
+        addional_headers += format!("{}:{} \r\n", key, value).as_str();
+    };
+    let response_string = format!(
+        "{}\r\n{}Content-Length: {}\r\n\r\n",
+        status_line,
+        addional_headers,
+        contents.len(),
+    );
+    //println!("Sending response: {:?}", response_string);
+    //response_string = format!("{}\r\nLocation: https://localhost:8443 \r\n\r\n", response_string);
+    let mut response = response_string.as_bytes().to_vec();
+    response.append(&mut contents);
+    Ok(response)
 }

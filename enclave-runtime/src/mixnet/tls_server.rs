@@ -332,12 +332,14 @@ impl Connection {
             let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
             let it = body_str.split("&");
             for i in it {
+                println!("{:?}", i);
                 let kv:Vec<&str> = i.split("=").collect();
                 let k = kv[0].to_string();
-                let v = String::from(kv[1]);
+                let v = String::from(kv[1]); println!("DEBUG: VALUE: {}", v);
                 if v!=String::from(""){
                     body_to_fill.insert(k,v);
                 }
+               
             }
             
         }

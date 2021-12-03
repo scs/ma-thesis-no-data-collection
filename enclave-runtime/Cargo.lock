@@ -3714,8 +3714,10 @@ dependencies = [
 [[package]]
 name = "urlencoding"
 version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68b90931029ab9b034b300b797048cf23723400aa757e8a2bfb9d748102f9821"
+source = "git+https://github.com/allanbenelli/rust_urlencoding-sgx.git?branch=sgx#54c36739911df7fd802362d709b5699929ee5c5a"
+dependencies = [
+ "sgx_tstd",
+]
 
 [[package]]
 name = "utf-8"

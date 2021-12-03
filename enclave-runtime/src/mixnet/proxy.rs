@@ -173,9 +173,9 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
-    println!("{} will be inserted to {:?}", cookie, target_domain);
+    //println!("{} will be inserted to {:?}", cookie, target_domain);
     target_domain.cookies.push(cookie);
-    println!("Vector now {:?}",  target_domain);
+    //println!("Vector now {:?}",  target_domain);
 }
 
 pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {

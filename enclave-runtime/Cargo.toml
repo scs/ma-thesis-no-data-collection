@@ -76,6 +76,7 @@ sct = { git = "https://github.com/mesalock-linux/sct.rs", branch="mesalock_sgx" 
 mio = { git = "https://github.com/mesalock-linux/mio-sgx", branch = "v0.6_sgx_1.1.3" }
 route-recognizer = {git = "https://github.com/allanbenelli/route-recognizer-sgx", branch="sgx"}
 #cookie = "0.15"
+urlencoding =  {git = "https://github.com/allanbenelli/rust_urlendcoding-sgx", branch="sgx"}
 
 # for attestation
 chrono = { git = "https://github.com/mesalock-linux/chrono-sgx" }

@@ -92,20 +92,6 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         } else {
             body_original.to_vec()
         }
-        /*
-        if content_type.contains("html") {
-            let res_str = String::from_utf8(body_original.to_vec()).expect("Invalid Response from host");
-            // handle response code
-            let mut clean = clean_urls(&res_str, &req).unwrap();
-            clean = add_base_tag(&clean).unwrap();
-            clean.as_bytes().to_vec()
-        } else if content_type.contains("javascript") {
-            let res_str = String::from_utf8(body_original.to_vec()).expect("Invalid Response from host");
-            let clean = clean_urls(&res_str, &req).unwrap();
-            clean.as_bytes().to_vec()
-        } else {
-            body_original.to_vec()
-        }*/
     } else if status_code.is_redirect() { // 300 - 399 Redirect // Intercept it and reset Cookie
         let location = res.headers().get("Location").unwrap();
         //println!("Retrying at {:?}", location);
@@ -117,6 +103,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
+        println!("DEBUG INFOS: {:?}", req);
 
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error

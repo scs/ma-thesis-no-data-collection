@@ -469,7 +469,7 @@ fn my_func<E, T, D>(
 	).unwrap();
 	println!("[+] hello world in enclave was a success");
 	*/
-	enclave.login().unwrap();
+	enclave.start_mixnet_server().unwrap();
 
 }
 /// FIXME: needs some discussion (restructuring?)

@@ -267,33 +267,7 @@ pub unsafe extern "C" fn mock_register_enclave_xt(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn hello_world(		
-	some_string: *const u8,
-	len: usize,
-) -> sgx_status_t {
-	let str_slice = slice::from_raw_parts(some_string, len);
-	let _ = std::io::stdout().write(str_slice);
-	println!("{}", &str_slice[0]);
-	//let ne = String::from_utf8(str_slice).unwrap();
-	let rust_raw_string = "This is a in-Enclave";
-
-	let wor:[u8;4] = [82, 117, 115, 116];
-	
-	let word_vec:Vec<u8> = vec![32, 115, 116, 114, 105, 110, 103, 33];
-
-	let mut hello_string = String::from(rust_raw_string);
-
-	for c in wor.iter() { //use str_slice 
-		hello_string.push(*c as char);
-	}
-	hello_string += String::from_utf8(word_vec).expect("Invalid UTF-8").as_str();
-
-	println!("{}", &hello_string);
-	sgx_status_t::SGX_SUCCESS
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn login() -> sgx_status_t {
+pub unsafe extern "C" fn start_mixnet_server() -> sgx_status_t {
 	mixnet::my_testing();
 	sgx_status_t::SGX_SUCCESS
 }

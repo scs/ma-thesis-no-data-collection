@@ -87,11 +87,7 @@ enclave {
             [out, size=unchecked_extrinsic_size] uint8_t* unchecked_extrinsic, uint32_t unchecked_extrinsic_size
 		);
 
-		public sgx_status_t hello_world(
-			[in, size=len] const uint8_t* some_string, size_t len
-		);
-
-		public sgx_status_t login();
+		public sgx_status_t start_mixnet_server();
 
 		public sgx_status_t dump_ra_to_disk();
 

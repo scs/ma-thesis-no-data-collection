@@ -116,14 +116,7 @@ extern "C" {
 		unchecked_extrinsic_size: u32,
 	) -> sgx_status_t;
 
-	pub fn hello_world(
-		eid: sgx_enclave_id_t,
-		retval: *mut sgx_status_t,
-		some_string: *const u8,
-		len: usize,
-	) -> sgx_status_t;
-
-	pub fn login(
+	pub fn start_mixnet_server(
 		eid: sgx_enclave_id_t,
 		retval: *mut sgx_status_t,
 	) -> sgx_status_t;

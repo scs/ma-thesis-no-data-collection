@@ -25,51 +25,18 @@ use itp_enclave_api_ffi as ffi;
 use sgx_types::*;
 
 pub trait MixNet: Send + Sync + 'static {
-	// Testing Hello World function
-	fn hello_world(
-		&self,
-		some_string: *const u8,
-		len: usize
-	) -> EnclaveResult<()>;
-	fn login(
+	fn start_mixnet_server(
 		&self
 	) -> EnclaveResult<()>;
 }
 
 impl MixNet for Enclave {
-	fn hello_world(
-		&self,
-		some_string: *const u8,
-		len: usize
-	) -> EnclaveResult<()>{
-		let mut retval = sgx_status_t::SGX_SUCCESS;
-		println!("[->] Calling ffi::hello_world");
-		let result = unsafe {
-			ffi::hello_world(
-				self.eid,
-				&mut retval,
-				some_string, 
-				len,
-			)
-		};
-		println!("[<-] Returned from ffi::hello_world");
-		match result {
-			sgx_status_t::SGX_SUCCESS => {},
-			_ => {
-				println!("[-] ECALL Enclave Failes {}!", result.as_str());
-			}
-		}
-		ensure!(result == sgx_status_t::SGX_SUCCESS, Error::Sgx(result));
-        ensure!(retval == sgx_status_t::SGX_SUCCESS, Error::Sgx(retval));
-		Ok(())
-	}
-
-	fn login(
+	fn start_mixnet_server(
 		&self
 	) -> EnclaveResult<()> {
 		let mut retval = sgx_status_t::SGX_SUCCESS;
 		let result = unsafe {
-			ffi::login(
+			ffi::start_mixnet_server(
 				self.eid,
 				&mut retval,
 			)

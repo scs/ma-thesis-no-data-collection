@@ -81,8 +81,6 @@ use sp_runtime::traits::Block as BlockT;
 use std::{slice, sync::Arc, vec::Vec};
 use substrate_api_client::compose_extrinsic_offline;
 
-use std::io::Write;
-
 #[macro_use]
 extern crate lazy_static;
 mod mixnet;
@@ -268,7 +266,7 @@ pub unsafe extern "C" fn mock_register_enclave_xt(
 
 #[no_mangle]
 pub unsafe extern "C" fn start_mixnet_server() -> sgx_status_t {
-	mixnet::my_testing();
+	mixnet::start_tls_server();
 	sgx_status_t::SGX_SUCCESS
 }
 

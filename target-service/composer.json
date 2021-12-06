@@ -7,6 +7,14 @@
     "require": {
         "php": "^7.3|^8.0",
         "fruitcake/laravel-cors": "^2.0",
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> Logging UserID
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
         "geoip/geoip": "~1.14",
         "geoip2/geoip2": "~2.0",
         "guzzlehttp/guzzle": "^7.0.1",
@@ -16,6 +24,24 @@
         "laravel/tinker": "^2.5",
         "laravel/ui": "^3.3",
         "pragmarx/tracker": "^4.0"
+<<<<<<< HEAD
+=======
+=======
+        "geoip2/geoip2": "~2.0",
+>>>>>>> Added antonioribeiro tracker
+        "guzzlehttp/guzzle": "^7.0.1",
+        "laravel/framework": "^8.65",
+        "laravel/sanctum": "^2.11",
+        "laravel/tinker": "^2.5",
+<<<<<<< HEAD
+        "laravel/ui": "^3.3"
+>>>>>>> Add target-service
+=======
+        "laravel/ui": "^3.3",
+        "pragmarx/tracker": "^4.0"
+>>>>>>> Added antonioribeiro tracker
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
     },
     "require-dev": {
         "facade/ignition": "^2.5",
@@ -40,8 +66,22 @@
     "scripts": {
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
             "@php artisan package:discover --ansi",
             "@php -r \"copy('.input.php.override', './vendor/laravel/framework/src/Illuminate/Support/Facades/Input.php');\""
+=======
+            "@php artisan package:discover --ansi"
+>>>>>>> Add target-service
+=======
+            "@php artisan package:discover --ansi",
+            "@php -r \"copy('.input.php.override', './vendor/laravel/framework/src/Illuminate/Support/Facades/Input.php');\""
+>>>>>>> Added antonioribeiro tracker
+=======
+            "@php artisan package:discover --ansi",
+            "@php -r \"copy('.input.php.override', './vendor/laravel/framework/src/Illuminate/Support/Facades/Input.php');\""
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi"

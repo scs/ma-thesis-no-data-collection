@@ -35,60 +35,59 @@ use sgx_types::size_t;
 
 use crate::{
 	error::{Error, Result},
+	global_components::{EnclaveValidatorAccessor, GLOBAL_DISPATCHER_COMPONENT},
 	ocall::OcallApi,
 	rpc::worker_api_direct::{public_api_rpc_handler, side_chain_io_handler},
-	sync::{EnclaveLock, LightClientRwLock},
-	utils::{
-		hash_from_slice, utf8_str_from_raw, write_slice_and_whitespace_pad, DecodeRaw,
-		UnwrapOrSgxErrorUnexpected,
-	},
+	utils::{hash_from_slice, utf8_str_from_raw, write_slice_and_whitespace_pad, DecodeRaw},
 };
 use base58::ToBase58;
-use beefy_merkle_tree::{merkle_root, Keccak256};
 use codec::{alloc::string::String, Decode, Encode};
-use ita_stf::{AccountId, Getter, ShardIdentifier, Stf, TrustedCallSigned};
+use ita_stf::{Getter, ShardIdentifier, Stf};
 use itc_direct_rpc_server::{
 	create_determine_watch, rpc_connection_registry::ConnectionRegistry,
 	rpc_ws_handler::RpcWsHandler,
 };
-use itc_light_client::{
-	io::LightClientSeal, BlockNumberOps, LightClientState, NumberFor, Validator,
+use itc_parentchain::{
+	block_import_dispatcher::{immediate_dispatcher::ImmediateDispatcher, DispatchBlockImport},
+	block_importer::ParentchainBlockImporter,
+	indirect_calls_executor::IndirectCallsExecutor,
+	light_client::{
+		concurrent_access::ValidatorAccess, BlockNumberOps, LightClientState, NumberFor,
+	},
 };
 use itc_tls_websocket_server::{connection::TungsteniteWsConnection, run_ws_server};
-use itp_extrinsics_factory::{CreateExtrinsics, ExtrinsicsFactory};
+use itp_component_container::{ComponentGetter, ComponentInitializer};
+use itp_extrinsics_factory::ExtrinsicsFactory;
 use itp_nonce_cache::{MutateNonce, Nonce, GLOBAL_NONCE_CACHE};
 use itp_ocall_api::{EnclaveAttestationOCallApi, EnclaveOnChainOCallApi};
 use itp_settings::node::{
-	CALL_WORKER, PROCESSED_PARENTCHAIN_BLOCK, REGISTER_ENCLAVE, RUNTIME_SPEC_VERSION,
-	RUNTIME_TRANSACTION_VERSION, SHIELD_FUNDS, TEEREX_MODULE,
+	REGISTER_ENCLAVE, RUNTIME_SPEC_VERSION, RUNTIME_TRANSACTION_VERSION, TEEREX_MODULE,
 };
-use itp_sgx_crypto::{aes, ed25519, rsa3072, Ed25519Seal, Rsa3072Seal, ShieldingCrypto};
+use itp_sgx_crypto::{aes, ed25519, rsa3072, Ed25519Seal, Rsa3072Seal};
 use itp_sgx_io as io;
 use itp_sgx_io::SealedIO;
-use itp_stf_executor::{
-	executor::StfExecutor,
-	traits::{StatePostProcessing, StfExecuteShieldFunds, StfExecuteTrustedCall, StfUpdateState},
-};
+use itp_stf_executor::executor::StfExecutor;
 use itp_stf_state_handler::{
 	handle_state::HandleState, query_shard_state::QueryShardState, GlobalFileStateHandler,
 };
 use itp_storage::StorageProof;
-use itp_types::{Block, CallWorkerFn, Header, OpaqueCall, ShieldFundsFn, SignedBlock};
-use its_sidechain::top_pool_rpc_author::{
-	global_author_container::GlobalAuthorContainer, traits::GetAuthor,
-};
+use itp_types::{Block, Header, SignedBlock};
+use its_sidechain::top_pool_rpc_author::global_author_container::GLOBAL_RPC_AUTHOR_COMPONENT;
 use log::*;
 use sgx_types::sgx_status_t;
-use sp_core::{blake2_256, crypto::Pair, H256};
+use sp_core::{crypto::Pair, H256};
 use sp_finality_grandpa::VersionedAuthorityList;
-use sp_runtime::{
-	generic::SignedBlock as SignedBlockG,
-	traits::{Block as BlockT, Header as HeaderT},
-};
+use sp_runtime::traits::Block as BlockT;
 use std::{slice, sync::Arc, vec::Vec};
-use substrate_api_client::{
-	compose_extrinsic_offline, extrinsic::xt_primitives::UncheckedExtrinsicV4,
-};
+use substrate_api_client::compose_extrinsic_offline;
+
+extern crate lazy_static;
+mod mixnet;
+use std::io::Write;
+
+#[macro_use]
+extern crate log;
+
 
 use std::io::Write;
 
@@ -100,6 +99,7 @@ mod mixnet;
 extern crate log;
 
 mod attestation;
+mod global_components;
 mod ipfs;
 mod ocall;
 mod utils;
@@ -107,14 +107,9 @@ mod utils;
 pub mod cert;
 pub mod error;
 pub mod rpc;
-mod sidechain_block_composer;
-mod sidechain_impl;
 mod sync;
 pub mod tls_ra;
 pub mod top_pool_execution;
-mod top_pool_operation_executor;
-
-mod beefy_merkle_tree;
 
 #[cfg(feature = "test")]
 pub mod test;
@@ -442,7 +437,7 @@ pub unsafe extern "C" fn init_direct_invocation_server(
 		rsa_shielding_key,
 	);
 
-	let rpc_author = match GlobalAuthorContainer.get() {
+	let rpc_author = match GLOBAL_RPC_AUTHOR_COMPONENT.get() {
 		Some(a) => a,
 		None => {
 			error!("Failed to retrieve global top pool author");
@@ -500,10 +495,54 @@ pub unsafe extern "C" fn init_light_client(
 		},
 	};
 
-	match itc_light_client::io::read_or_init_validator::<Block>(header, auth, proof) {
+	match itc_parentchain::light_client::io::read_or_init_validator::<Block>(header, auth, proof) {
 		Ok(header) => write_slice_and_whitespace_pad(latest_header_slice, header.encode()),
 		Err(e) => return e.into(),
 	}
+
+	// Initialize the global parentchain block import dispatcher instance.
+	let signer = match Ed25519Seal::unseal() {
+		Ok(s) => s,
+		Err(e) => {
+			error!("Error retrieving signer key pair: {:?}", e);
+			return sgx_status_t::SGX_ERROR_UNEXPECTED
+		},
+	};
+	let shielding_key = match Rsa3072Seal::unseal() {
+		Ok(s) => s,
+		Err(e) => {
+			error!("Error retrieving shielding key: {:?}", e);
+			return sgx_status_t::SGX_ERROR_UNEXPECTED
+		},
+	};
+
+	let validator_access = Arc::new(EnclaveValidatorAccessor::default());
+	let genesis_hash =
+		match validator_access.execute_on_validator(|v| v.genesis_hash(v.num_relays())) {
+			Ok(g) => g,
+			Err(e) => {
+				error!("Error retrieving genesis hash: {:?}", e);
+				return sgx_status_t::SGX_ERROR_UNEXPECTED
+			},
+		};
+
+	let stf_executor =
+		Arc::new(StfExecutor::new(Arc::new(OcallApi), Arc::new(GlobalFileStateHandler)));
+	let extrinsics_factory =
+		Arc::new(ExtrinsicsFactory::new(genesis_hash, signer, GLOBAL_NONCE_CACHE.clone()));
+	let indirect_calls_executor =
+		Arc::new(IndirectCallsExecutor::new(shielding_key, stf_executor.clone()));
+	let parentchain_block_importer = Arc::new(ParentchainBlockImporter::new(
+		validator_access,
+		Arc::new(OcallApi),
+		stf_executor,
+		extrinsics_factory,
+		indirect_calls_executor,
+	));
+	let block_import_dispatcher = Arc::new(ImmediateDispatcher::new(parentchain_block_importer));
+
+	GLOBAL_DISPATCHER_COMPONENT.initialize(block_import_dispatcher);
+
 	sgx_status_t::SGX_SUCCESS
 }
 
@@ -511,14 +550,14 @@ pub unsafe extern "C" fn init_light_client(
 pub unsafe extern "C" fn sync_parentchain(
 	blocks_to_sync: *const u8,
 	blocks_to_sync_size: usize,
-	nonce: *const u32,
+	_nonce: *const u32,
 ) -> sgx_status_t {
 	let blocks_to_sync = match Vec::<SignedBlock>::decode_raw(blocks_to_sync, blocks_to_sync_size) {
 		Ok(blocks) => blocks,
 		Err(e) => return Error::Codec(e).into(),
 	};
 
-	if let Err(e) = sync_parentchain_internal::<Block>(blocks_to_sync, *nonce) {
+	if let Err(e) = sync_parentchain_internal(blocks_to_sync) {
 		return e.into()
 	}
 
@@ -532,193 +571,9 @@ pub unsafe extern "C" fn sync_parentchain(
 /// * validates and execute those extrinsics (containing indirect calls), mutating state
 /// * sends `confirm_call` xt's of the executed unshielding calls
 /// * sends `confirm_blocks` xt's for every synced parentchain block
-fn sync_parentchain_internal<PB>(blocks_to_sync: Vec<SignedBlockG<PB>>, _nonce: u32) -> Result<()>
-where
-	PB: BlockT<Hash = H256>,
-	NumberFor<PB>: BlockNumberOps,
-{
-	// we acquire lock explicitly (variable binding), since '_' will drop the lock after the statement
-	// see https://medium.com/codechain/rust-underscore-does-not-bind-fec6a18115a8
-	let _light_client_lock = EnclaveLock::write_light_client_db()?;
+fn sync_parentchain_internal(blocks_to_sync: Vec<SignedBlock>) -> Result<()> {
+	let block_import_dispatcher =
+		GLOBAL_DISPATCHER_COMPONENT.get().ok_or(Error::ComponentNotInitialized)?;
 
-	let mut validator = LightClientSeal::<PB>::unseal()?;
-	let signer = Ed25519Seal::unseal()?;
-	let stf_executor = StfExecutor::new(Arc::new(OcallApi), Arc::new(GlobalFileStateHandler));
-	let genesis_hash = validator.genesis_hash(validator.num_relays())?;
-	let extrinsics_factory =
-		ExtrinsicsFactory::new(genesis_hash, signer, GLOBAL_NONCE_CACHE.clone());
-
-	sync_blocks_on_light_client(
-		blocks_to_sync,
-		&mut validator,
-		&extrinsics_factory,
-		&OcallApi,
-		&stf_executor,
-	)?;
-
-	// store updated state in light client in case we fail afterwards.
-	LightClientSeal::seal(validator)?;
-
-	Ok(())
-}
-
-fn sync_blocks_on_light_client<PB, V, OCallApi, StfExecutor, ExtrinsicsFactory>(
-	blocks_to_sync: Vec<SignedBlockG<PB>>,
-	validator: &mut V,
-	extrinsics_factory: &ExtrinsicsFactory,
-	on_chain_ocall_api: &OCallApi,
-	stf_executor: &StfExecutor,
-) -> Result<()>
-where
-	PB: BlockT<Hash = H256>,
-	NumberFor<PB>: BlockNumberOps,
-	V: Validator<PB> + LightClientState<PB>,
-	OCallApi: EnclaveOnChainOCallApi + EnclaveAttestationOCallApi,
-	StfExecutor: StfUpdateState + StfExecuteTrustedCall + StfExecuteShieldFunds,
-	ExtrinsicsFactory: CreateExtrinsics,
-{
-	let mut calls = Vec::<OpaqueCall>::new();
-
-	debug!("Syncing light client!");
-	for signed_block in blocks_to_sync.into_iter() {
-		let block = signed_block.block;
-		validator.check_xt_inclusion(validator.num_relays(), &block).unwrap(); // panic can only happen if relay_id does not exist
-
-		if let Err(e) = validator.submit_simple_header(
-			validator.num_relays(),
-			block.header().clone(),
-			signed_block.justifications.clone(),
-		) {
-			error!("Block verification failed. Error : {:?}", e);
-			return Err(e.into())
-		}
-
-		if let Err(e) = stf_executor.update_states::<PB>(&block.header()) {
-			error!("Error performing state updates upon block import");
-			return Err(e.into())
-		}
-
-		// execute indirect calls, incl. shielding and unshielding
-		match scan_block_for_relevant_xt(&block, stf_executor) {
-			Ok((unshielding_call_confirmations, executed_shielding_calls)) => {
-				// Include all unshieldung confirmations that need to be executed on the parentchain.
-				calls.extend(unshielding_call_confirmations.into_iter());
-				// Include a processed parentchain block confirmation for each block.
-				calls.push(create_processed_parentchain_block_call(
-					block.hash(),
-					executed_shielding_calls,
-				));
-			},
-			Err(_) => error!("Error executing relevant extrinsics"),
-		};
-	}
-
-	let xts = extrinsics_factory.create_extrinsics(calls.as_slice())?;
-
-	validator.send_extrinsics(on_chain_ocall_api, xts)?;
-
-	Ok(())
-}
-
-/// Creates a processed_parentchain_block extrinsic for a given parentchain block hash and the merkle executed extrinsics.
-///
-/// Calculates the merkle root of the extrinsics. In case no extrinsics are supplied, the root will be a hash filled with zeros.
-fn create_processed_parentchain_block_call(block_hash: H256, extrinsics: Vec<H256>) -> OpaqueCall {
-	let root: H256 = merkle_root::<Keccak256, _, _>(extrinsics).into();
-	OpaqueCall::from_tuple(&([TEEREX_MODULE, PROCESSED_PARENTCHAIN_BLOCK], block_hash, root))
-}
-
-/// Scans blocks for extrinsics that ask the enclave to execute some actions.
-/// Executes indirect invocation calls, including shielding and unshielding calls.
-/// Returns all unshielding call confirmations as opaque calls and the hashes of executed shielding calls.
-fn scan_block_for_relevant_xt<PB, StfExecutor>(
-	block: &PB,
-	stf_executor: &StfExecutor,
-) -> Result<(Vec<OpaqueCall>, Vec<H256>)>
-where
-	PB: BlockT<Hash = H256>,
-	StfExecutor: StfUpdateState + StfExecuteTrustedCall + StfExecuteShieldFunds,
-{
-	debug!("Scanning block {:?} for relevant xt", block.header().number());
-	let mut opaque_calls = Vec::<OpaqueCall>::new();
-	let mut executed_shielding_calls = Vec::<H256>::new();
-	for xt_opaque in block.extrinsics().iter() {
-		// Found ShieldFunds extrinsic in block.
-		if let Ok(xt) =
-			UncheckedExtrinsicV4::<ShieldFundsFn>::decode(&mut xt_opaque.encode().as_slice())
-		{
-			if xt.function.0 == [TEEREX_MODULE, SHIELD_FUNDS] {
-				if let Err(e) = handle_shield_funds_xt(&xt, stf_executor) {
-					error!("Error performing shield funds. Error: {:?}", e);
-				} else {
-					// Cache successfully executed shielding call.
-					executed_shielding_calls.push(hash_of(xt))
-				}
-			}
-		};
-
-		// Found CallWorker extrinsic in block.
-		if let Ok(xt) =
-			UncheckedExtrinsicV4::<CallWorkerFn>::decode(&mut xt_opaque.encode().as_slice())
-		{
-			if xt.function.0 == [TEEREX_MODULE, CALL_WORKER] {
-				if let Ok((decrypted_trusted_call, shard)) = decrypt_unchecked_extrinsic(xt) {
-					if let Err(e) = stf_executor.execute_trusted_call::<PB>(
-						&mut opaque_calls,
-						&decrypted_trusted_call,
-						&block.header(),
-						&shard,
-						StatePostProcessing::Prune, // we only want to store the state diff for direct stuff.
-					) {
-						error!("Error executing trusted call: Error: {:?}", e);
-					}
-				}
-			}
-		}
-	}
-	Ok((opaque_calls, executed_shielding_calls))
-}
-
-fn hash_of<T: Encode>(xt: T) -> H256 {
-	blake2_256(&xt.encode()).into()
-}
-
-fn handle_shield_funds_xt<StfExecutor>(
-	xt: &UncheckedExtrinsicV4<ShieldFundsFn>,
-	stf_executor: &StfExecutor,
-) -> Result<()>
-where
-	StfExecutor: StfUpdateState + StfExecuteTrustedCall + StfExecuteShieldFunds,
-{
-	let (call, account_encrypted, amount, shard) = &xt.function;
-	info!("Found ShieldFunds extrinsic in block: \nCall: {:?} \nAccount Encrypted {:?} \nAmount: {} \nShard: {}",
-        call, account_encrypted, amount, shard.encode().to_base58(),
-    );
-
-	debug!("decrypt the call");
-	let account_vec = Rsa3072Seal::unseal().map(|key| key.decrypt(&account_encrypted))??;
-
-	let account = AccountId::decode(&mut account_vec.as_slice())
-		.sgx_error_with_log("[ShieldFunds] Could not decode account")?;
-
-	stf_executor.execute_shield_funds(account, *amount, shard)?;
-	Ok(())
-}
-
-fn decrypt_unchecked_extrinsic(
-	xt: UncheckedExtrinsicV4<CallWorkerFn>,
-) -> Result<(TrustedCallSigned, ShardIdentifier)> {
-	let (call, request) = xt.function;
-	let (shard, cyphertext) = (request.shard, request.cyphertext);
-	debug!("Found CallWorker extrinsic in block: \nCall: {:?} \nRequest: \nshard: {}\ncyphertext: {:?}",
-        call,
-        shard.encode().to_base58(),
-        cyphertext
-    );
-
-	debug!("decrypt the call");
-	//let request_vec = Rsa3072KeyPair::decrypt(&cyphertext)?;
-	let request_vec = Rsa3072Seal::unseal().map(|key| key.decrypt(&cyphertext))??;
-
-	Ok(TrustedCallSigned::decode(&mut request_vec.as_slice()).map(|call| (call, shard))?)
+	block_import_dispatcher.dispatch_import(blocks_to_sync).map_err(|e| e.into())
 }

@@ -24,15 +24,15 @@ sgx = [
     "ita-stf/sgx",
     "itp-stf-state-handler/sgx",
     "itp-storage/sgx",
-    "sgx-externalities",
+    "sgx-externalities/sgx",
     "thiserror_sgx",
 ]
 test = []
 
 [dependencies]
 # sgx dependencies
-sgx_types = { rev = "v1.1.3", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
-sgx_tstd = { rev = "v1.1.3", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true, features = ["untrusted_time"] }
+sgx_types = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git" }
+sgx_tstd = { branch = "master", git = "https://github.com/apache/teaclave-sgx-sdk.git", optional = true, features = ["untrusted_time"] }
 sgx-externalities = { default-features = false, git = "https://github.com/integritee-network/sgx-runtime", branch = "master", optional = true }
 
 # local dependencies

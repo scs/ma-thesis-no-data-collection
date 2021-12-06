@@ -17,9 +17,29 @@
                         {{__('Hello Guest')}}
                     @else
                         {{ __('You are logged in!') }}
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+                            {{$users ?? '' }}
+                    @endguest
+<<<<<<< HEAD
+
+=======
+                    @endguest
+>>>>>>> Add target-service
+=======
+                    {{$users ?? '' }}
+>>>>>>> WIP: tracking User
+=======
                             {{$users ?? '' }}
                     @endguest
 
+>>>>>>> Logging UserID
+=======
+                            {{$users ?? '' }}
+                    @endguest
+
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
                 </div>
             </div>
         </div>

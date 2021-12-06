@@ -16,9 +16,6 @@
 */
 use crate::Hash;
 use codec::{Decode, Error, Input};
-use its_sidechain::slots::duration_now;
-use log::*;
-use sgx_types::sgx_status_t;
 use std::{slice, vec::Vec};
 
 pub fn hash_from_slice(hash_slize: &[u8]) -> Hash {
@@ -28,9 +25,7 @@ pub fn hash_from_slice(hash_slize: &[u8]) -> Hash {
 }
 
 pub fn write_slice_and_whitespace_pad(writable: &mut [u8], data: Vec<u8>) {
-	if data.len() > writable.len() {
-		panic!("not enough bytes in output buffer for return value");
-	}
+	assert!(!data.len() > writable.len(), "Not enough bytes in output buffer for return value");
 	let (left, right) = writable.split_at_mut(data.len());
 	left.clone_from_slice(&data);
 	// fill the right side with whitespace
@@ -70,55 +65,4 @@ pub unsafe fn utf8_str_from_raw<'a>(
 	let bytes = slice::from_raw_parts(data, len);
 
 	std::str::from_utf8(bytes)
-}
-
-/// returns current duration since unix epoch in millis as u64
-pub fn now_as_u64() -> u64 {
-	duration_now().as_millis() as u64
-}
-
-pub trait UnwrapOrSgxErrorUnexpected {
-	type ReturnType;
-	fn sgx_error(self) -> Result<Self::ReturnType, sgx_status_t>;
-	fn sgx_error_with_log(self, err_mgs: &str) -> Result<Self::ReturnType, sgx_status_t>;
-}
-
-impl<T> UnwrapOrSgxErrorUnexpected for Option<T> {
-	type ReturnType = T;
-	fn sgx_error(self) -> Result<Self::ReturnType, sgx_status_t> {
-		match self {
-			Some(r) => Ok(r),
-			None => Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
-		}
-	}
-
-	fn sgx_error_with_log(self, log_msg: &str) -> Result<Self::ReturnType, sgx_status_t> {
-		match self {
-			Some(r) => Ok(r),
-			None => {
-				error!("{}", log_msg);
-				Err(sgx_status_t::SGX_ERROR_UNEXPECTED)
-			},
-		}
-	}
-}
-
-impl<T, S> UnwrapOrSgxErrorUnexpected for Result<T, S> {
-	type ReturnType = T;
-	fn sgx_error(self) -> Result<Self::ReturnType, sgx_status_t> {
-		match self {
-			Ok(r) => Ok(r),
-			Err(_) => Err(sgx_status_t::SGX_ERROR_UNEXPECTED),
-		}
-	}
-
-	fn sgx_error_with_log(self, log_msg: &str) -> Result<Self::ReturnType, sgx_status_t> {
-		match self {
-			Ok(r) => Ok(r),
-			Err(_) => {
-				error!("{}", log_msg);
-				Err(sgx_status_t::SGX_ERROR_UNEXPECTED)
-			},
-		}
-	}
 }

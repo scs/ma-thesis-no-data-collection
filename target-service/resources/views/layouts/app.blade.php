@@ -33,12 +33,31 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <!-- Left Side Of Navbar -->
                     <ul class="navbar-nav mr-auto">
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
                         <li class="nav-item">
                             <a class="nav-link" href="{{ route('tracker.stats.index') }}">{{ __('Stats') }}</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="admin/user-activity">{{ __('User-Activity') }}</a>
                         </li>
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+
+>>>>>>> Add target-service
+=======
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ route('tracker.stats.index') }}">{{ __('Stats') }}</a>
+                        </li>
+>>>>>>> Add small navigation to stats
+=======
+>>>>>>> Add Again Haruncpi
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
                     </ul>
 
                     <!-- Right Side Of Navbar -->

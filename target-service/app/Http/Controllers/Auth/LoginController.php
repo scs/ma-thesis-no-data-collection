@@ -5,8 +5,21 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
 use Illuminate\Support\Facades\Auth;
 use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
+=======
+>>>>>>> Add target-service
+=======
+use Illuminate\Support\Facades\Auth;
+use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
+>>>>>>> Logging UserID
+=======
+use Illuminate\Support\Facades\Auth;
+use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
 class LoginController extends Controller
 {

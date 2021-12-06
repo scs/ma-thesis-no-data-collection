@@ -18,29 +18,41 @@
 use crate::{
 	error::{Error, Result},
 	ocall::OcallApi,
-	sidechain_block_composer::BlockComposer,
-	sidechain_impl::{exec_aura_on_slot, ProposerFactory},
 	sync::{EnclaveLock, EnclaveStateRWLock},
-	top_pool_operation_executor::{ExecuteGettersOnTopPool, TopPoolOperationExecutor},
 };
-use itc_light_client::{io::LightClientSeal, BlockNumberOps, LightClientState, NumberFor};
-use itp_extrinsics_factory::ExtrinsicsFactory;
+use codec::Encode;
+use itc_parentchain::light_client::{
+	concurrent_access::ValidatorAccess, BlockNumberOps, LightClientState, NumberFor, Validator,
+	ValidatorAccessor,
+};
+use itp_component_container::ComponentGetter;
+use itp_extrinsics_factory::{CreateExtrinsics, ExtrinsicsFactory};
 use itp_nonce_cache::GLOBAL_NONCE_CACHE;
+use itp_ocall_api::{EnclaveAttestationOCallApi, EnclaveOnChainOCallApi, EnclaveSidechainOCallApi};
 use itp_settings::sidechain::SLOT_DURATION;
 use itp_sgx_crypto::{AesSeal, Ed25519Seal};
 use itp_sgx_io::SealedIO;
 use itp_stf_executor::executor::StfExecutor;
 use itp_stf_state_handler::{query_shard_state::QueryShardState, GlobalFileStateHandler};
-use itp_types::{Block, H256};
+use itp_time_utils::{duration_now, remaining_time};
+use itp_types::{Block, OpaqueCall, H256};
 use its_sidechain::{
-	primitives::types::block::SignedBlock as SignedSidechainBlock,
-	slots::{duration_now, remaining_time, sgx::LastSlotSeal, yield_next_slot},
-	top_pool_rpc_author::{global_author_container::GlobalAuthorContainer, traits::GetAuthor},
+	aura::{proposer_factory::ProposerFactory, Aura, SlotClaimStrategy},
+	block_composer::BlockComposer,
+	consensus_common::{Environment, Error as ConsensusError},
+	primitives::{
+		traits::{Block as SidechainBlockT, ShardIdentifierFor, SignedBlock},
+		types::block::SignedBlock as SignedSidechainBlock,
+	},
+	slots::{sgx::LastSlotSeal, yield_next_slot, PerShardSlotWorkerScheduler, SlotInfo},
+	top_pool_executor::{TopPoolGetterOperator, TopPoolOperationHandler},
+	top_pool_rpc_author::global_author_container::GLOBAL_RPC_AUTHOR_COMPONENT,
 };
 use log::*;
 use sgx_types::sgx_status_t;
-use sp_runtime::traits::Block as BlockT;
-use std::sync::Arc;
+use sp_core::Pair;
+use sp_runtime::{traits::Block as BlockT, MultiSignature};
+use std::{sync::Arc, vec::Vec};
 
 #[no_mangle]
 pub unsafe extern "C" fn execute_trusted_getters() -> sgx_status_t {
@@ -57,7 +69,7 @@ pub unsafe extern "C" fn execute_trusted_getters() -> sgx_status_t {
 fn execute_top_pool_trusted_getters_on_all_shards() -> Result<()> {
 	use itp_settings::enclave::MAX_TRUSTED_GETTERS_EXEC_DURATION;
 
-	let rpc_author = GlobalAuthorContainer.get().ok_or_else(|| {
+	let rpc_author = GLOBAL_RPC_AUTHOR_COMPONENT.get().ok_or_else(|| {
 		error!("Failed to retrieve author mutex. It might not be initialized?");
 		Error::MutexAccess
 	})?;
@@ -69,10 +81,8 @@ fn execute_top_pool_trusted_getters_on_all_shards() -> Result<()> {
 	let mut remaining_shards = shards.len() as u32;
 	let ends_at = duration_now() + MAX_TRUSTED_GETTERS_EXEC_DURATION;
 
-	let top_pool_executor = TopPoolOperationExecutor::<Block, SignedSidechainBlock, _, _>::new(
-		rpc_author,
-		stf_executor,
-	);
+	let top_pool_executor =
+		TopPoolOperationHandler::<Block, SignedSidechainBlock, _, _>::new(rpc_author, stf_executor);
 
 	// Execute trusted getters for each shard. Each shard gets equal amount of time to execute
 	// getters.
@@ -123,28 +133,31 @@ where
 {
 	// we acquire lock explicitly (variable binding), since '_' will drop the lock after the statement
 	// see https://medium.com/codechain/rust-underscore-does-not-bind-fec6a18115a8
-	let (_light_client_lock, _side_chain_lock) = EnclaveLock::write_all()?;
+	let _side_chain_lock = EnclaveLock::write_all()?;
 
-	let mut validator = LightClientSeal::<PB>::unseal()?;
+	let validator_access = ValidatorAccessor::<PB>::default();
+
+	let (latest_onchain_header, genesis_hash) = validator_access.execute_on_validator(|v| {
+		let latest_onchain_header = v.latest_finalized_header(v.num_relays())?;
+		let genesis_hash = v.genesis_hash(v.num_relays())?;
+		Ok((latest_onchain_header, genesis_hash))
+	})?;
 
 	let authority = Ed25519Seal::unseal()?;
 	let state_key = AesSeal::unseal()?;
 
-	let rpc_author = GlobalAuthorContainer.get().ok_or_else(|| {
+	let rpc_author = GLOBAL_RPC_AUTHOR_COMPONENT.get().ok_or_else(|| {
 		error!("Failed to retrieve author mutex. Maybe it's not initialized?");
 		Error::MutexAccess
 	})?;
 
 	let state_handler = Arc::new(GlobalFileStateHandler);
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
-
-	let latest_onchain_header = validator.latest_finalized_header(validator.num_relays()).unwrap();
-	let genesis_hash = validator.genesis_hash(validator.num_relays())?;
 	let extrinsics_factory =
 		ExtrinsicsFactory::new(genesis_hash, authority.clone(), GLOBAL_NONCE_CACHE.clone());
 
 	let top_pool_executor =
-		Arc::new(TopPoolOperationExecutor::<PB, SignedSidechainBlock, _, _>::new(
+		Arc::new(TopPoolOperationHandler::<PB, SignedSidechainBlock, _, _>::new(
 			rpc_author.clone(),
 			stf_executor.clone(),
 		));
@@ -161,7 +174,7 @@ where
 			exec_aura_on_slot::<_, _, SignedSidechainBlock, _, _, _, _>(
 				slot,
 				authority,
-				&mut validator,
+				&validator_access,
 				&extrinsics_factory,
 				OcallApi,
 				env,
@@ -174,7 +187,60 @@ where
 		},
 	};
 
-	LightClientSeal::seal(validator)?;
+	Ok(())
+}
+
+/// Executes aura for the given `slot`.
+fn exec_aura_on_slot<
+	Authority,
+	PB,
+	SB,
+	OCallApi,
+	ValidatorAccessor,
+	PEnvironment,
+	ExtrinsicsFactory,
+>(
+	slot: SlotInfo<PB>,
+	authority: Authority,
+	validator_access: &ValidatorAccessor,
+	extrinsics_factory: &ExtrinsicsFactory,
+	ocall_api: OCallApi,
+	proposer_environment: PEnvironment,
+	shards: Vec<ShardIdentifierFor<SB>>,
+) -> Result<()>
+where
+	PB: BlockT<Hash = H256>,
+	SB: SignedBlock<Public = Authority::Public, Signature = MultiSignature> + 'static, // Setting the public type is necessary due to some non-generic downstream code.
+	SB::Block: SidechainBlockT<ShardIdentifier = H256, Public = Authority::Public>,
+	SB::Signature: From<Authority::Signature>,
+	Authority: Pair<Public = sp_core::ed25519::Public>,
+	Authority::Public: Encode,
+	OCallApi:
+		EnclaveSidechainOCallApi + EnclaveOnChainOCallApi + EnclaveAttestationOCallApi + 'static,
+	ValidatorAccessor: ValidatorAccess<PB> + Clone + Send + Sync + 'static,
+	NumberFor<PB>: BlockNumberOps,
+	PEnvironment: Environment<PB, SB, Error = ConsensusError> + Send + Sync,
+	ExtrinsicsFactory: CreateExtrinsics,
+{
+	log::info!("[Aura] Executing aura for slot: {:?}", slot);
+
+	let mut aura =
+		Aura::<_, _, SB, PEnvironment, _>::new(authority, ocall_api.clone(), proposer_environment)
+			.with_claim_strategy(SlotClaimStrategy::Always)
+			.with_allow_delayed_proposal(true);
+
+	let (blocks, xts): (Vec<_>, Vec<_>) =
+		PerShardSlotWorkerScheduler::on_slot(&mut aura, slot, shards)
+			.into_iter()
+			.map(|r| (r.block, r.parentchain_effects))
+			.unzip();
+
+	ocall_api.propose_sidechain_blocks(blocks)?;
+	let opaque_calls: Vec<OpaqueCall> = xts.into_iter().flatten().collect();
+
+	let xts = extrinsics_factory.create_extrinsics(opaque_calls.as_slice())?;
+
+	validator_access.execute_mut_on_validator(|v| v.send_extrinsics(&ocall_api, xts))?;
 
 	Ok(())
 }

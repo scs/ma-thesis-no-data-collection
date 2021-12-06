@@ -23,6 +23,20 @@
         "vue": "^2.6.12",
         "vue-loader": "^15.9.8",
         "vue-template-compiler": "^2.6.12"
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
     },
     "dependencies": {}
+=======
+    }
+>>>>>>> Add target-service
+=======
+    },
+    "dependencies": {}
+>>>>>>> get dependencies from bower
+=======
+    },
+    "dependencies": {}
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 }

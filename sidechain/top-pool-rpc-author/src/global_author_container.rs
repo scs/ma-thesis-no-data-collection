@@ -15,40 +15,16 @@
 
 */
 
-#[cfg(feature = "sgx")]
-use std::sync::SgxMutex as Mutex;
-
-#[cfg(feature = "std")]
-use std::sync::Mutex;
-
 use crate::{
-	atomic_container::AtomicContainer,
 	author::{Author, AuthorTopFilter},
 	pool_types::BPool,
-	traits::GetAuthor,
 };
+use itp_component_container::ComponentContainer;
 use itp_stf_state_handler::GlobalFileStateHandler;
 use sgx_crypto_helper::rsa3072::Rsa3072KeyPair;
-use std::sync::Arc;
 
-static GLOBAL_AUTHOR_CONTAINER: AtomicContainer = AtomicContainer::new();
+pub type EnclaveRpcAuthor = Author<BPool, AuthorTopFilter, GlobalFileStateHandler, Rsa3072KeyPair>;
 
-/// Global container wrapper for the RPC author
-/// must be initialized before use, calling the `initialize()` method
-pub struct GlobalAuthorContainer;
-
-impl GlobalAuthorContainer {
-	pub fn initialize(trusted_operation_pool: Arc<<Self as GetAuthor>::AuthorType>) {
-		GLOBAL_AUTHOR_CONTAINER.store(trusted_operation_pool)
-	}
-}
-
-impl GetAuthor for GlobalAuthorContainer {
-	type AuthorType = Author<BPool, AuthorTopFilter, GlobalFileStateHandler, Rsa3072KeyPair>;
-
-	fn get(&self) -> Option<Arc<Self::AuthorType>> {
-		let author_mutex: &'static Mutex<Arc<Self::AuthorType>> = GLOBAL_AUTHOR_CONTAINER.load()?;
-
-		Some(author_mutex.lock().unwrap().clone())
-	}
-}
+/// Global instance of the RPC author (only usable in `sgx` feature).
+pub static GLOBAL_RPC_AUTHOR_COMPONENT: ComponentContainer<EnclaveRpcAuthor> =
+	ComponentContainer::new();

@@ -62,6 +62,13 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+<<<<<<< HEAD
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> Added antonioribeiro tracker
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
         'tracker' => [
             'driver' => 'mysql',
             'url' => env('DATABASE_URL'),
@@ -81,6 +88,14 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> Add target-service
+=======
+>>>>>>> Added antonioribeiro tracker
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
         'pgsql' => [
             'driver' => 'pgsql',

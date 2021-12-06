@@ -18,21 +18,23 @@ use crate::{
 	attestation,
 	ocall::OcallApi,
 	rpc,
-	sidechain_block_composer::{BlockComposer, ComposeBlockAndConfirmation},
 	sync::tests::{enclave_rw_lock_works, sidechain_rw_lock_works},
 	test::{cert_tests::*, mocks::rpc_responder_mock::RpcResponderMock},
-	top_pool_operation_executor::{ExecuteCallsOnTopPool, TopPoolOperationExecutor},
 };
 use codec::{Decode, Encode};
 use ita_stf::{
-	helpers::account_key_hash, test_genesis::test_account as funded_pair, AccountInfo,
-	ShardIdentifier, State, StatePayload, StateTypeDiff, Stf, TrustedCall, TrustedCallSigned,
-	TrustedGetter, TrustedOperation,
+	helpers::{
+		account_key_hash, get_parentchain_blockhash, get_parentchain_number,
+		get_parentchain_parenthash,
+	},
+	test_genesis::test_account as funded_pair,
+	AccountInfo, ShardIdentifier, State, StatePayload, StateTypeDiff, Stf, TrustedCall,
+	TrustedCallSigned, TrustedGetter, TrustedOperation,
 };
 use itp_ocall_api::EnclaveAttestationOCallApi;
 use itp_settings::{
 	enclave::MAX_TRUSTED_OPS_EXEC_DURATION,
-	node::{PROCESSED_PARENTCHAIN_BLOCK, PROPOSED_SIDECHAIN_BLOCK, TEEREX_MODULE},
+	node::{PROPOSED_SIDECHAIN_BLOCK, TEEREX_MODULE},
 };
 use itp_sgx_crypto::{Aes, StateCrypto};
 use itp_stf_executor::executor::StfExecutor;
@@ -43,12 +45,14 @@ use itp_test::mock::{
 };
 use itp_types::{Block, Header, MrEnclave, OpaqueCall};
 use its_sidechain::{
+	block_composer::{BlockComposer, ComposeBlockAndConfirmation},
 	primitives::{
 		traits::{Block as BlockT, SignedBlock as SignedBlockT},
 		types::block::SignedBlock,
 	},
 	state::{LastBlockExt, SidechainDB, SidechainState, SidechainSystemExt},
 	top_pool::{basic_pool::BasicPool, pool::ExtrinsicHash},
+	top_pool_executor::{TopPoolCallOperator, TopPoolOperationHandler},
 	top_pool_rpc_author::{
 		api::SidechainApi,
 		author::Author,
@@ -76,25 +80,19 @@ pub extern "C" fn test_main_entrance() -> size_t {
 		itp_stf_state_handler::tests::test_sgx_state_decode_encode_works,
 		itp_stf_state_handler::tests::test_encrypt_decrypt_state_type_works,
 		itp_stf_state_handler::tests::test_write_access_locks_read_until_finished,
+		itp_stf_state_handler::tests::test_ensure_subsequent_state_loads_have_same_hash,
 		test_compose_block_and_confirmation,
 		test_submit_trusted_call_to_top_pool,
 		test_submit_trusted_getter_to_top_pool,
 		test_differentiate_getter_and_call_works,
 		test_create_block_and_confirmation_works,
-		ensure_empty_extrinsic_vec_triggers_zero_filled_merkle_root,
-		ensure_non_empty_extrinsic_vec_triggers_non_zero_merkle_root,
 		// needs node to be running.. unit tests?
 		// test_ocall_worker_request,
 		test_create_state_diff,
 		test_executing_call_updates_account_nonce,
+		test_call_set_update_parentchain_block,
 		test_invalid_nonce_call_is_not_executed,
 		test_non_root_shielding_call_is_not_executed,
-		its_sidechain::state::tests::apply_state_update_works,
-		// Fixme: State hashes are flawed #421
-		// its_sidechain::state::tests::apply_state_update_returns_storage_hash_mismatch_err,
-		// its_sidechain::state::tests::apply_state_update_returns_invalid_storage_diff_err,
-		its_sidechain::state::tests::sp_io_storage_set_creates_storage_diff,
-		its_sidechain::state::tests::create_state_diff_without_setting_externalities_works,
 		rpc::worker_api_direct::tests::test_given_io_handler_methods_then_retrieve_all_names_as_string,
 		author_tests::top_encryption_works,
 		author_tests::submitting_to_author_inserts_in_pool,
@@ -104,6 +102,8 @@ pub extern "C" fn test_main_entrance() -> size_t {
 		handle_state_mock::tests::shard_exists_after_inserting,
 		handle_state_mock::tests::load_initialized_inserts_default_state,
 		handle_state_mock::tests::load_mutate_and_write_works,
+		handle_state_mock::tests::ensure_subsequent_state_loads_have_same_hash,
+		handle_state_mock::tests::ensure_encode_and_encrypt_does_not_affect_state_hash,
 		// mra cert tests
 		test_verify_mra_cert_should_work,
 		test_verify_wrong_cert_is_err,
@@ -135,7 +135,7 @@ fn test_compose_block_and_confirmation() {
 	let (lock, state) = state_handler.load_for_mutation(&shard).unwrap();
 	let mut db = SidechainDB::<SignedBlock, _>::new(state);
 	db.set_block_number(&1);
-	let previous_state_hash = db.state_hash();
+	let initial_state_hash = db.state_hash();
 	state_handler.write(db.ext, lock, &shard).unwrap();
 
 	// when
@@ -144,7 +144,7 @@ fn test_compose_block_and_confirmation() {
 			&latest_parentchain_header(),
 			signed_top_hashes,
 			shard,
-			previous_state_hash,
+			initial_state_hash,
 		)
 		.unwrap();
 
@@ -249,7 +249,7 @@ fn test_create_block_and_confirmation_works() {
 	// given
 	let (rpc_author, _, shard, mrenclave, shielding_key, state_handler) = test_setup();
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
-	let top_pool_executor = TopPoolOperationExecutor::<Block, SignedBlock, _, _>::new(
+	let top_pool_executor = TopPoolOperationHandler::<Block, SignedBlock, _, _>::new(
 		rpc_author.clone(),
 		stf_executor.clone(),
 	);
@@ -276,7 +276,7 @@ fn test_create_block_and_confirmation_works() {
 
 	// when
 	let execution_result = top_pool_executor
-		.execute_trusted_calls(&latest_parentchain_header(), shard, MAX_TRUSTED_OPS_EXEC_DURATION)
+		.execute_trusted_calls(&latest_parentchain_header(), &shard, MAX_TRUSTED_OPS_EXEC_DURATION)
 		.unwrap();
 
 	let executed_operation_hashes =
@@ -287,7 +287,7 @@ fn test_create_block_and_confirmation_works() {
 			&latest_parentchain_header(),
 			executed_operation_hashes,
 			shard,
-			execution_result.previous_state_hash,
+			execution_result.initial_state_hash,
 		)
 		.unwrap();
 
@@ -312,7 +312,7 @@ fn test_create_state_diff() {
 	// given
 	let (rpc_author, _, shard, mrenclave, shielding_key, state_handler) = test_setup();
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
-	let top_pool_executor = TopPoolOperationExecutor::<Block, SignedBlock, _, _>::new(
+	let top_pool_executor = TopPoolOperationHandler::<Block, SignedBlock, _, _>::new(
 		rpc_author.clone(),
 		stf_executor.clone(),
 	);
@@ -339,7 +339,7 @@ fn test_create_state_diff() {
 
 	// when
 	let execution_result = top_pool_executor
-		.execute_trusted_calls(&latest_parentchain_header(), shard, MAX_TRUSTED_OPS_EXEC_DURATION)
+		.execute_trusted_calls(&latest_parentchain_header(), &shard, MAX_TRUSTED_OPS_EXEC_DURATION)
 		.unwrap();
 
 	let executed_operation_hashes =
@@ -350,7 +350,7 @@ fn test_create_state_diff() {
 			&latest_parentchain_header(),
 			executed_operation_hashes,
 			shard,
-			execution_result.previous_state_hash,
+			execution_result.initial_state_hash,
 		)
 		.unwrap();
 
@@ -378,7 +378,7 @@ fn test_executing_call_updates_account_nonce() {
 	let (rpc_author, _, shard, mrenclave, shielding_key, state_handler) = test_setup();
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
 	let top_pool_executor =
-		TopPoolOperationExecutor::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
+		TopPoolOperationHandler::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
 
 	let sender = funded_pair();
 	let receiver = unfunded_public();
@@ -396,7 +396,7 @@ fn test_executing_call_updates_account_nonce() {
 
 	// when
 	let _ = top_pool_executor
-		.execute_trusted_calls(&latest_parentchain_header(), shard, MAX_TRUSTED_OPS_EXEC_DURATION)
+		.execute_trusted_calls(&latest_parentchain_header(), &shard, MAX_TRUSTED_OPS_EXEC_DURATION)
 		.unwrap();
 
 	// then
@@ -405,12 +405,34 @@ fn test_executing_call_updates_account_nonce() {
 	assert_eq!(nonce, 1);
 }
 
+fn test_call_set_update_parentchain_block() {
+	let (_, _, shard, _, _, state_handler) = test_setup();
+	let mut state = state_handler.load_initialized(&shard).unwrap();
+
+	let block_number = 3;
+	let parent_hash = H256::from([1; 32]);
+
+	let header: Header = HeaderT::new(
+		block_number,
+		Default::default(),
+		Default::default(),
+		parent_hash,
+		Default::default(),
+	);
+
+	Stf::update_parentchain_block(&mut state, header.clone()).unwrap();
+
+	assert_eq!(header.hash(), state.execute_with(|| get_parentchain_blockhash().unwrap()));
+	assert_eq!(parent_hash, state.execute_with(|| get_parentchain_parenthash().unwrap()));
+	assert_eq!(block_number, state.execute_with(|| get_parentchain_number().unwrap()));
+}
+
 fn test_invalid_nonce_call_is_not_executed() {
 	// given
 	let (rpc_author, _, shard, mrenclave, shielding_key, state_handler) = test_setup();
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
 	let top_pool_executor =
-		TopPoolOperationExecutor::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
+		TopPoolOperationHandler::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
 
 	// create accounts
 	let sender = funded_pair();
@@ -429,7 +451,7 @@ fn test_invalid_nonce_call_is_not_executed() {
 
 	// when
 	let _ = top_pool_executor
-		.execute_trusted_calls(&latest_parentchain_header(), shard, MAX_TRUSTED_OPS_EXEC_DURATION)
+		.execute_trusted_calls(&latest_parentchain_header(), &shard, MAX_TRUSTED_OPS_EXEC_DURATION)
 		.unwrap();
 
 	// then
@@ -446,7 +468,7 @@ fn test_non_root_shielding_call_is_not_executed() {
 	let (rpc_author, mut state, shard, mrenclave, shielding_key, state_handler) = test_setup();
 	let stf_executor = Arc::new(StfExecutor::new(Arc::new(OcallApi), state_handler.clone()));
 	let top_pool_executor =
-		TopPoolOperationExecutor::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
+		TopPoolOperationHandler::<Block, SignedBlock, _, _>::new(rpc_author.clone(), stf_executor);
 
 	let sender = funded_pair();
 	let sender_acc = sender.public().into();
@@ -466,7 +488,7 @@ fn test_non_root_shielding_call_is_not_executed() {
 
 	// when
 	let _ = top_pool_executor
-		.execute_trusted_calls(&latest_parentchain_header(), shard, MAX_TRUSTED_OPS_EXEC_DURATION)
+		.execute_trusted_calls(&latest_parentchain_header(), &shard, MAX_TRUSTED_OPS_EXEC_DURATION)
 		.unwrap();
 
 	// then
@@ -477,34 +499,6 @@ fn test_non_root_shielding_call_is_not_executed() {
 
 	assert_eq!(nonce, 0);
 	assert_eq!(funds_new, funds_old);
-}
-
-fn ensure_empty_extrinsic_vec_triggers_zero_filled_merkle_root() {
-	// given
-	let block_hash = H256::from([1; 32]);
-	let extrinsics = Vec::new();
-	let expected_call =
-		([TEEREX_MODULE, PROCESSED_PARENTCHAIN_BLOCK], block_hash, H256::default()).encode();
-
-	// when
-	let call = crate::create_processed_parentchain_block_call(block_hash, extrinsics);
-
-	// then
-	assert_eq!(call.0, expected_call);
-}
-
-fn ensure_non_empty_extrinsic_vec_triggers_non_zero_merkle_root() {
-	// given
-	let block_hash = H256::from([1; 32]);
-	let extrinsics = vec![H256::from([4; 32]), H256::from([9; 32])];
-	let zero_root_call =
-		([TEEREX_MODULE, PROCESSED_PARENTCHAIN_BLOCK], block_hash, H256::default()).encode();
-
-	// when
-	let call = crate::create_processed_parentchain_block_call(block_hash, extrinsics);
-
-	// then
-	assert_ne!(call.0, zero_root_call);
 }
 
 /// returns an empty `State` with the corresponding `ShardIdentifier`
@@ -580,7 +574,7 @@ fn unfunded_public() -> spEd25519::Public {
 	spEd25519::Public::from_raw(*b"asdfasdfadsfasdfasfasdadfadfasdf")
 }
 
-pub fn test_account() -> spEd25519::Pair {
+fn test_account() -> spEd25519::Pair {
 	spEd25519::Pair::from_seed(b"42315678901234567890123456789012")
 }
 

@@ -32,9 +32,7 @@ pub mod sgx_reexport_prelude {
 }
 
 pub mod api;
-pub mod atomic_container;
 pub mod author;
-pub mod author_container;
 pub mod client_error;
 pub mod error;
 pub mod pool_types;

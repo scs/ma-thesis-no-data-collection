@@ -22,6 +22,8 @@
 #[cfg(all(feature = "std", feature = "sgx"))]
 compile_error!("feature \"std\" and feature \"sgx\" cannot be enabled at the same time");
 
+pub use its_block_composer as block_composer;
+
 pub use its_consensus_aura as aura;
 
 pub use its_consensus_common as consensus_common;
@@ -35,6 +37,8 @@ pub use its_rpc_handler as rpc_handler;
 pub use its_state as state;
 
 pub use its_top_pool as top_pool;
+
+pub use its_top_pool_executor as top_pool_executor;
 
 pub use its_top_pool_rpc_author as top_pool_rpc_author;
 

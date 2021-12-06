@@ -15,7 +15,6 @@
 
 */
 use crate::{
-	direct_invocation::{watch_list_service::WatchListService, watching_client::WsWatchingClient},
 	error::Error,
 	globals::{
 		tokio_handle::{GetTokioHandle, GlobalTokioHandle},
@@ -56,10 +55,10 @@ use itp_settings::{
 };
 use itp_types::SignedBlock;
 use its_primitives::types::SignedBlock as SignedSidechainBlock;
+use its_storage::{start_sidechain_pruning_loop, BlockPruner, SidechainStorageLock};
 use log::*;
 use my_node_runtime::{pallet_teerex::ShardIdentifier, Event, Hash, Header};
 use sgx_types::*;
-use sidechain_storage::{BlockPruner, SidechainStorageLock};
 use sp_core::{
 	crypto::{AccountId32, Ss58Codec},
 	sr25519, Pair,
@@ -81,13 +80,11 @@ use std::{
 use substrate_api_client::{rpc::WsRpcClient, utils::FromHexString, Api, GenericAddress, XtStatus};
 
 mod config;
-mod direct_invocation;
 mod enclave;
 mod error;
 mod globals;
 mod node_api_factory;
 mod ocall_bridge;
-mod sidechain_storage;
 mod sync_block_gossiper;
 mod tests;
 mod utils;
@@ -124,20 +121,18 @@ fn main() {
 			.unwrap(),
 	);
 	let node_api_factory = Arc::new(GlobalUrlNodeApiFactory::new(config.node_url()));
-	let direct_invocation_watch_list = Arc::new(WatchListService::<WsWatchingClient>::new());
 	let enclave = Arc::new(enclave_init().unwrap());
 
 	// initialize o-call bridge with a concrete factory implementation
 	OCallBridge::initialize(Arc::new(OCallBridgeComponentFactory::new(
 		node_api_factory.clone(),
 		sync_block_gossiper,
-		direct_invocation_watch_list,
 		enclave.clone(),
 		sidechain_blockstorage.clone(),
 	)));
 
 	if let Some(smatches) = matches.subcommand_matches("run") {
-		let shard = extract_shard(&smatches, enclave.as_ref());
+		let shard = extract_shard(smatches, enclave.as_ref());
 
 		// Todo: Is this deprecated?? It is only used in remote attestation.
 		config.set_ext_api_url(
@@ -169,6 +164,8 @@ fn main() {
 			tokio_handle,
 		);
 	} else if let Some(smatches) = matches.subcommand_matches("mixnet") {
+<<<<<<< HEAD
+=======
 		let shard = extract_shard(&smatches, enclave.as_ref());
 
 		// Todo: Is this deprecated?? It is only used in remote attestation.
@@ -202,7 +199,41 @@ fn main() {
 			tokio_handle,
 		);
 	} else if let Some(smatches) = matches.subcommand_matches("request-keys") {
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 		let shard = extract_shard(&smatches, enclave.as_ref());
+
+		// Todo: Is this deprecated?? It is only used in remote attestation.
+		config.set_ext_api_url(
+			smatches
+				.value_of("w-server")
+				.map(ToString::to_string)
+				.unwrap_or_else(|| format!("ws://127.0.0.1:{}", config.worker_rpc_port)),
+		);
+
+		println!("Worker Config: {:?}", config);
+		let skip_ra = smatches.is_present("skip-ra");
+
+		let node_api = node_api_factory.create_api().set_signer(AccountKeyring::Alice.pair());
+		
+		GlobalWorker::reset_worker(Worker::new(
+			config.clone(),
+			node_api.clone(),
+			enclave.clone(),
+			DirectClient::new(config.worker_url()),
+		));
+		
+		
+		my_func(
+			config,
+			&shard,
+			enclave,
+			sidechain_blockstorage,
+			skip_ra,
+			node_api,
+			tokio_handle,
+		);
+	} else if let Some(smatches) = matches.subcommand_matches("request-keys") {
+		let shard = extract_shard(smatches, enclave.as_ref());
 		let provider_url = smatches.value_of("provider").expect("provider must be specified");
 		request_keys(provider_url, &shard, enclave.as_ref(), smatches.is_present("skip-ra"));
 	} else if matches.is_present("shielding-key") {
@@ -235,7 +266,7 @@ fn main() {
 	} else if matches.is_present("mrenclave") {
 		println!("{}", enclave.get_mrenclave().unwrap().encode().to_base58());
 	} else if let Some(_matches) = matches.subcommand_matches("init-shard") {
-		let shard = extract_shard(&_matches, enclave.as_ref());
+		let shard = extract_shard(_matches, enclave.as_ref());
 		init_shard(&shard);
 	} else if let Some(_matches) = matches.subcommand_matches("test") {
 		if _matches.is_present("provisioning-server") {
@@ -328,6 +359,7 @@ fn my_func<E, T, D>(
 			.unwrap();
 		println!("[+] RPC direction invocation server shut down");
 	});
+<<<<<<< HEAD
 
 	// listen for sidechain_block import request. Later the `start_worker_api_direct_server`
 	// should be merged into this one.
@@ -357,6 +389,37 @@ fn my_func<E, T, D>(
 		.set_nonce(nonce)
 		.expect("Could not set nonce of enclave. Returning here...");
 
+=======
+
+	// listen for sidechain_block import request. Later the `start_worker_api_direct_server`
+	// should be merged into this one.
+	let url = worker_url_into_async_rpc_url(&config.worker_url()).unwrap();
+
+	let handle = tokio_handle.get_handle();
+	let enclave_for_block_gossip_rpc_server = enclave.clone();
+	handle.spawn(async move {
+		itc_rpc_server::run_server(&url, enclave_for_block_gossip_rpc_server)
+			.await
+			.unwrap()
+	});
+	// ------------------------------------------------------------------------
+	// start the substrate-api-client to communicate with the node
+	let genesis_hash = node_api.genesis_hash.as_bytes().to_vec();
+
+	let tee_accountid = enclave_account(enclave.as_ref());
+	ensure_account_has_funds(&mut node_api, &tee_accountid);
+
+	// ------------------------------------------------------------------------
+	// perform a remote attestation and get an unchecked extrinsic back
+
+	// get enclaves's account nonce
+	let nonce = node_api.get_nonce_of(&tee_accountid).unwrap();
+	info!("Enclave nonce = {:?}", nonce);
+	enclave
+		.set_nonce(nonce)
+		.expect("Could not set nonce of enclave. Returning here...");
+
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 	let uxt = if skip_ra {
 		println!(
 			"[!] skipping remote attestation. Registering enclave without attestation report."
@@ -597,7 +660,7 @@ fn start_worker<E, T, D>(
 	thread::Builder::new()
 		.name("sidechain_pruning_loop".to_owned())
 		.spawn(move || {
-			sidechain_storage::start_sidechain_pruning_loop(
+			start_sidechain_pruning_loop(
 				&sidechain_storage,
 				SIDECHAIN_PURGE_INTERVAL,
 				SIDECHAIN_PURGE_LIMIT,
@@ -700,7 +763,7 @@ fn request_keys<E: TlsRemoteAttestation>(
 	enclave_request_key_provisioning(
 		enclave_api,
 		sgx_quote_sign_type_t::SGX_UNLINKABLE_SIGNATURE,
-		&provider_url,
+		provider_url,
 		skip_ra,
 	)
 	.unwrap();
@@ -739,7 +802,7 @@ fn print_events(events: Events, _sender: Sender<String>) {
 					my_node_runtime::pallet_teerex::RawEvent::AddedEnclave(sender, worker_url) => {
 						println!("[+] Received AddedEnclave event");
 						println!("    Sender (Worker):  {:?}", sender);
-						println!("    Registered URL: {:?}", str::from_utf8(&worker_url).unwrap());
+						println!("    Registered URL: {:?}", str::from_utf8(worker_url).unwrap());
 					},
 					my_node_runtime::pallet_teerex::RawEvent::Forwarded(shard) => {
 						println!(
@@ -824,7 +887,7 @@ fn subscribe_to_parentchain_new_headers<E: EnclaveBase + Sidechain>(
 	mut last_synced_header: Header,
 ) -> Result<(), Error> {
 	let (sender, receiver) = channel();
-	api.subscribe_finalized_heads(sender).map_err(Error::ApiClientError)?;
+	api.subscribe_finalized_heads(sender).map_err(Error::ApiClient)?;
 
 	loop {
 		let new_header: Header = match receiver.recv() {
@@ -968,7 +1031,7 @@ fn ensure_account_has_funds(api: &mut Api<sr25519::Pair, WsRpcClient>, accountid
 	info!("    Alice's Account Nonce is {}", nonce);
 
 	// check account balance
-	let free = api.get_free_balance(&accountid).unwrap();
+	let free = api.get_free_balance(accountid).unwrap();
 	info!("TEE's free balance = {:?}", free);
 
 	let existential_deposit = api.get_existential_deposit().unwrap();
@@ -992,7 +1055,7 @@ fn ensure_account_has_funds(api: &mut Api<sr25519::Pair, WsRpcClient>, accountid
 		info!("[<] Extrinsic got finalized. Hash: {:?}\n", xt_hash);
 
 		//verify funds have arrived
-		let free = api.get_free_balance(&accountid);
+		let free = api.get_free_balance(accountid);
 		info!("TEE's NEW free balance = {:?}", free);
 
 		api.signer = signer_orig;

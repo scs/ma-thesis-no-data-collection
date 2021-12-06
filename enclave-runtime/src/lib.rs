@@ -32,6 +32,7 @@ extern crate sgx_tstd as std;
 #[cfg(not(feature = "test"))]
 use sgx_types::size_t;
 
+
 use crate::{
 	error::{Error, Result},
 	global_components::{EnclaveValidatorAccessor, GLOBAL_DISPATCHER_COMPONENT},
@@ -87,6 +88,15 @@ use std::io::Write;
 #[macro_use]
 extern crate log;
 
+
+use std::io::Write;
+
+
+extern crate lazy_static;
+mod mixnet;
+
+#[macro_use]
+extern crate log;
 
 mod attestation;
 mod global_components;

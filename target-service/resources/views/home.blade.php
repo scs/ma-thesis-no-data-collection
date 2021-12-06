@@ -19,6 +19,7 @@
                         {{ __('You are logged in!') }}
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                             {{$users ?? '' }}
                     @endguest
 <<<<<<< HEAD
@@ -34,6 +35,11 @@
                     @endguest
 
 >>>>>>> Logging UserID
+=======
+                            {{$users ?? '' }}
+                    @endguest
+
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
                 </div>
             </div>
         </div>

@@ -167,12 +167,16 @@ return [
          */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
 =======
 >>>>>>> Add target-service
 =======
         PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
 >>>>>>> Added antonioribeiro tracker
+=======
+        PragmaRX\Tracker\Vendor\Laravel\ServiceProvider::class,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
         /*
          * Application Service Providers...
@@ -239,6 +243,7 @@ return [
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
 
 =======
@@ -247,6 +252,10 @@ return [
         'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
 
 >>>>>>> Added antonioribeiro tracker
+=======
+        'Tracker' => 'PragmaRX\Tracker\Vendor\Laravel\Facade',
+
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
     ],
 
 ];

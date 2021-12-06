@@ -10,6 +10,7 @@
                 <div class="card-body">
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                     <form method="POST" action="{{ route('my_login') }}">
 =======
                     <form method="POST" action="{{ route('login') }}">
@@ -17,6 +18,9 @@
 =======
                     <form method="POST" action="{{ route('my_login') }}">
 >>>>>>> Logging UserID
+=======
+                    <form method="POST" action="{{ route('my_login') }}">
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
                         @csrf
 
                         <div class="form-group row">

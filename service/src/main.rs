@@ -164,6 +164,42 @@ fn main() {
 			tokio_handle,
 		);
 	} else if let Some(smatches) = matches.subcommand_matches("mixnet") {
+<<<<<<< HEAD
+=======
+		let shard = extract_shard(&smatches, enclave.as_ref());
+
+		// Todo: Is this deprecated?? It is only used in remote attestation.
+		config.set_ext_api_url(
+			smatches
+				.value_of("w-server")
+				.map(ToString::to_string)
+				.unwrap_or_else(|| format!("ws://127.0.0.1:{}", config.worker_rpc_port)),
+		);
+
+		println!("Worker Config: {:?}", config);
+		let skip_ra = smatches.is_present("skip-ra");
+
+		let node_api = node_api_factory.create_api().set_signer(AccountKeyring::Alice.pair());
+		
+		GlobalWorker::reset_worker(Worker::new(
+			config.clone(),
+			node_api.clone(),
+			enclave.clone(),
+			DirectClient::new(config.worker_url()),
+		));
+		
+		
+		my_func(
+			config,
+			&shard,
+			enclave,
+			sidechain_blockstorage,
+			skip_ra,
+			node_api,
+			tokio_handle,
+		);
+	} else if let Some(smatches) = matches.subcommand_matches("request-keys") {
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 		let shard = extract_shard(&smatches, enclave.as_ref());
 
 		// Todo: Is this deprecated?? It is only used in remote attestation.
@@ -323,6 +359,7 @@ fn my_func<E, T, D>(
 			.unwrap();
 		println!("[+] RPC direction invocation server shut down");
 	});
+<<<<<<< HEAD
 
 	// listen for sidechain_block import request. Later the `start_worker_api_direct_server`
 	// should be merged into this one.
@@ -352,6 +389,37 @@ fn my_func<E, T, D>(
 		.set_nonce(nonce)
 		.expect("Could not set nonce of enclave. Returning here...");
 
+=======
+
+	// listen for sidechain_block import request. Later the `start_worker_api_direct_server`
+	// should be merged into this one.
+	let url = worker_url_into_async_rpc_url(&config.worker_url()).unwrap();
+
+	let handle = tokio_handle.get_handle();
+	let enclave_for_block_gossip_rpc_server = enclave.clone();
+	handle.spawn(async move {
+		itc_rpc_server::run_server(&url, enclave_for_block_gossip_rpc_server)
+			.await
+			.unwrap()
+	});
+	// ------------------------------------------------------------------------
+	// start the substrate-api-client to communicate with the node
+	let genesis_hash = node_api.genesis_hash.as_bytes().to_vec();
+
+	let tee_accountid = enclave_account(enclave.as_ref());
+	ensure_account_has_funds(&mut node_api, &tee_accountid);
+
+	// ------------------------------------------------------------------------
+	// perform a remote attestation and get an unchecked extrinsic back
+
+	// get enclaves's account nonce
+	let nonce = node_api.get_nonce_of(&tee_accountid).unwrap();
+	info!("Enclave nonce = {:?}", nonce);
+	enclave
+		.set_nonce(nonce)
+		.expect("Could not set nonce of enclave. Returning here...");
+
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 	let uxt = if skip_ra {
 		println!(
 			"[!] skipping remote attestation. Registering enclave without attestation report."

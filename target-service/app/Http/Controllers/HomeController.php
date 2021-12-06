@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
 =======
 >>>>>>> Add target-service
@@ -15,6 +16,9 @@ use PragmaRX\Tracker\Tracker;
 =======
 use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
 >>>>>>> Logging UserID
+=======
+use PragmaRX\Tracker\Vendor\Laravel\Facade as Tracker;
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
 class HomeController extends Controller
 {
@@ -38,6 +42,7 @@ class HomeController extends Controller
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
         $visitor = Tracker::currentSession();
 
         //$users = Tracker::onlineUsers();
@@ -52,11 +57,16 @@ class HomeController extends Controller
         return view('home', ['users' => $users]);
 >>>>>>> WIP: tracking User
 =======
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
         $visitor = Tracker::currentSession();
 
         //$users = Tracker::onlineUsers();
         $users = "";
         return view('home', ['users' => $visitor]);
+<<<<<<< HEAD
 >>>>>>> Logging UserID
+=======
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
     }
 }

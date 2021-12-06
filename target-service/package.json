@@ -25,6 +25,7 @@
         "vue-template-compiler": "^2.6.12"
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     },
     "dependencies": {}
 =======
@@ -34,4 +35,8 @@
     },
     "dependencies": {}
 >>>>>>> get dependencies from bower
+=======
+    },
+    "dependencies": {}
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 }

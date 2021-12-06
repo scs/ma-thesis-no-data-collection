@@ -83,6 +83,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'console_log_enabled' => true,
 =======
     'console_log_enabled' => false,
@@ -90,6 +91,9 @@ return [
 =======
     'console_log_enabled' => true,
 >>>>>>> enable more tracking options
+=======
+    'console_log_enabled' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Log SQL queries?
@@ -146,6 +150,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_events' => true,
 =======
     'log_events' => false,
@@ -153,6 +158,9 @@ return [
 =======
     'log_events' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_events' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Which events do you want to log exactly?
@@ -199,6 +207,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_geoip' => true,
 =======
     'log_geoip' => false,
@@ -206,10 +215,14 @@ return [
 =======
     'log_geoip' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_geoip' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log the user agent?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     'log_user_agents' => true,
@@ -219,10 +232,14 @@ return [
 =======
     'log_user_agents' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_user_agents' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log your users?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -240,10 +257,14 @@ return [
 =======
     'log_users' => true,
 >>>>>>> Tracker update
+=======
+    'log_users' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log devices?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     'log_devices' => true,
@@ -253,10 +274,14 @@ return [
 =======
     'log_devices' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_devices' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log languages?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     'log_languages' => true,
@@ -266,10 +291,14 @@ return [
 =======
     'log_languages' => true,
 >>>>>>> WIP: tracking User
+=======
+    'log_languages' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log HTTP referers?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     'log_referers' => true,
@@ -279,10 +308,14 @@ return [
 =======
     'log_referers' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_referers' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log url paths?
      */
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
     'log_paths' => true,
@@ -292,6 +325,9 @@ return [
 =======
     'log_paths' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_paths' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Do you wish to log url queries and query arguments?
@@ -303,6 +339,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'log_routes' => true,
 =======
     'log_routes' => false,
@@ -310,6 +347,9 @@ return [
 =======
     'log_routes' => true,
 >>>>>>> enable more tracking options
+=======
+    'log_routes' => true,
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Log errors and exceptions?
@@ -327,6 +367,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'tracker_cookie_name' => 'test_cookie',
 =======
     'tracker_cookie_name' => 'please_change_this_cookie_name',
@@ -334,6 +375,9 @@ return [
 =======
     'tracker_cookie_name' => 'test_cookie',
 >>>>>>> Logging UserID
+=======
+    'tracker_cookie_name' => 'test_cookie',
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * Internal tracker session name.
@@ -351,6 +395,7 @@ return [
      */
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'user_model' => 'App\Models\User',
 =======
     'user_model' => 'PragmaRX\Tracker\Vendor\Laravel\Models\User',
@@ -358,6 +403,9 @@ return [
 =======
     'user_model' => 'App\Models\User',
 >>>>>>> WIP: tracking User
+=======
+    'user_model' => 'App\Models\User',
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     /*
      * You can use your own model for every single table Tracker has.
@@ -420,6 +468,7 @@ return [
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     'authentication_guards' => ['web'], // defaults to []
 =======
     'authentication_guards' => [], // defaults to []
@@ -427,6 +476,9 @@ return [
 =======
     'authentication_guards' => ['web'], // defaults to []
 >>>>>>> WIP: tracking User
+=======
+    'authentication_guards' => ['web'], // defaults to []
+>>>>>>> 1ba10e1cba7b340282a7448f129c895f9d8e6a67
 
     'authenticated_check_method' => 'check', // to Auth::check()
 

@@ -26,43 +26,23 @@ use rand::{Rng};
 #[derive(Clone,Debug)]
 pub struct Domain{
     pub uri: Uri,
-    pub cookie_name: String,
+    //pub cookie_name: String,
     pub cookies: Vec<String>,
 }
+ 
 lazy_static! {
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
+        let urls: Vec<&str> = vec!["test.benelli.dev", "www.blick.ch", "www.tagesanzeiger.ch", "www.nzz.ch", "www.republik.ch", "www.watson.ch"];
         let mut m = HashMap::new();
-        m.insert(String::from("test.benelli.dev"), Domain{
-            uri: "https://test.benelli.dev".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-        m.insert(String::from("www.blick.ch"), Domain{
-            uri: "https://www.blick.ch".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-        m.insert(String::from("www.tagesanzeiger.ch"), Domain{
-            uri: "https://www.tagesanzeiger.ch".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-        m.insert(String::from("www.nzz.ch"), Domain{
-            uri: "https://www.nzz.ch".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-        m.insert(String::from("www.republik.ch"), Domain{
-            uri: "https://www.republik.ch".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-        m.insert(String::from("www.watson.ch"), Domain{
-            uri: "https://www.watson.ch".parse().unwrap(),
-            cookie_name: String::from("hello"),
-            cookies: Vec::new(),
-        });
-       Mutex::new(m)
+        for url in urls {
+            let https_url = format!("https://{}", url);
+            m.insert(String::from(url), Domain{
+                uri: https_url.parse().unwrap(),
+                //cookie_name: String::from("hello"),
+                cookies: Vec::new(),
+            });
+        }
+        Mutex::new(m)
     };
 }
 
@@ -92,6 +72,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     headers.insert("Content-Type", content_type);
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
+
         if content_type.contains("html") {
             let res_str = String::from_utf8(body_original.to_vec()).expect("Invalid Response from host");
             // handle response code

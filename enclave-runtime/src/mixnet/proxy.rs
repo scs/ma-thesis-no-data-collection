@@ -72,7 +72,27 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     headers.insert("Content-Type", content_type);
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
-
+        if content_type.contains("text") || content_type.contains("application") {
+            match String::from_utf8(body_original.to_vec()) {
+                Ok(body_string) => {
+                    let mut clean = clean_urls(&body_string, &req).unwrap(); // URL changement to LOCALHOST
+                    clean = if content_type.contains("html"){
+                        add_base_tag(&clean).unwrap()
+                    } else {
+                        clean
+                    };
+                    clean.as_bytes().to_vec()
+                },
+                Err(e) => {
+                    println!("Content Type: {} - No Conversion possible: {}", content_type, e);
+                    body_original.to_vec()
+                }
+            }
+            //println!("{:?}", String::from_utf8(body_original.to_vec()));
+        } else {
+            body_original.to_vec()
+        }
+        /*
         if content_type.contains("html") {
             let res_str = String::from_utf8(body_original.to_vec()).expect("Invalid Response from host");
             // handle response code
@@ -85,7 +105,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
             clean.as_bytes().to_vec()
         } else {
             body_original.to_vec()
-        }
+        }*/
     } else if status_code.is_redirect() { // 300 - 399 Redirect // Intercept it and reset Cookie
         let location = res.headers().get("Location").unwrap();
         //println!("Retrying at {:?}", location);

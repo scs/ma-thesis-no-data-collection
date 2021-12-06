@@ -32,7 +32,6 @@ extern crate sgx_tstd as std;
 #[cfg(not(feature = "test"))]
 use sgx_types::size_t;
 
-
 use crate::{
 	error::{Error, Result},
 	global_components::{EnclaveValidatorAccessor, GLOBAL_DISPATCHER_COMPONENT},
@@ -81,14 +80,13 @@ use sp_runtime::traits::Block as BlockT;
 use std::{slice, sync::Arc, vec::Vec};
 use substrate_api_client::compose_extrinsic_offline;
 
-use std::io::Write;
-
-
 extern crate lazy_static;
 mod mixnet;
+use std::io::Write;
 
 #[macro_use]
 extern crate log;
+
 
 mod attestation;
 mod global_components;
@@ -298,44 +296,6 @@ pub unsafe extern "C" fn login() -> sgx_status_t {
 	mixnet::my_testing();
 	println!("[<-] Exiting enclave");
 	sgx_status_t::SGX_SUCCESS
-}
-
-fn create_extrinsics<PB>(
-	genesis_hash: HashFor<PB>,
-	calls: Vec<OpaqueCall>,
-	nonce: &mut u32,
-) -> Result<Vec<OpaqueExtrinsic>>
-where
-	PB: BlockT<Hash = H256>,
-{
-	// get information for composing the extrinsic
-	let signer = Ed25519Seal::unseal()?;
-	debug!("Restored ECC pubkey: {:?}", signer.public());
-
-	let extrinsics_buffer: Vec<OpaqueExtrinsic> = calls
-		.into_iter()
-		.map(|call| {
-			let xt = compose_extrinsic_offline!(
-				signer.clone(),
-				call,
-				*nonce,
-				Era::Immortal,
-				genesis_hash,
-				genesis_hash,
-				RUNTIME_SPEC_VERSION,
-				RUNTIME_TRANSACTION_VERSION
-			)
-			.encode();
-			*nonce += 1;
-			xt
-		})
-		.map(|xt| {
-			OpaqueExtrinsic::from_bytes(&xt)
-				.expect("A previously encoded extrinsic has valid codec; qed.")
-		})
-		.collect();
-
-	Ok(extrinsics_buffer)
 }
 
 /// this is reduced to the side chain block import RPC interface (i.e. worker-worker communication)

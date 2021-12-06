@@ -202,7 +202,7 @@ pub fn add_base_tag(content: & String) -> IOResult<String> {
 }
 
 pub fn get_logout_script() -> String {
-    let style = "<style> .proxy_target_logout {margin-bottom:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; } </style>";
+    let style = "<style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>";
     let script = "<script type=\"text/javascript\"> 
     window.onload = function () {
         let btn = document.createElement(\"button\");

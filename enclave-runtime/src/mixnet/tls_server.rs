@@ -380,6 +380,7 @@ impl Connection {
             self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
             //set auth
             parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
+        
             Ok(parsed_req)
         } else {
             Err(String::from("Request was invalid"))

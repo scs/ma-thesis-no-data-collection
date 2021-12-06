@@ -38,7 +38,7 @@ pub fn load_all_routes() -> Router<String> {
     router
 }
 
-pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
+pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
     //println!("path: {:?}", path);
     let router = load_all_routes();
     match &parsed_req.target {
@@ -70,6 +70,8 @@ pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
         },
         Some(_target) => {
             if parsed_req.auth {
+                parsed_req.method = Some("GET");
+                //println!("Parsed_Req: {:?}", parsed_req.method);
                 //println!("Need to check authentication here and change method for proxy");
                 if parsed_req.body.contains_key("cookie"){
                     let cookie = parsed_req.body.get("cookie").unwrap();
@@ -78,7 +80,8 @@ pub fn handle_routes(path: &str, parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
                         proxy(parsed_req)
                     } else { not_authorized() }
                 } else {
-                    not_authorized()
+                    proxy(parsed_req)
+                    //not_authorized()
                 }
                 //proxy(parsed_req)
             } else {

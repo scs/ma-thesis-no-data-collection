@@ -2,7 +2,7 @@
 use sgx_tstd as std;
 //use crate::mixnet::router;
 use crate::mixnet::tls_server::Request;
-use http_req::{request::RequestBuilder, tls, uri::Uri, response::{Response, Headers}};
+use http_req::{request::{RequestBuilder, Method}, tls, uri::Uri, response::{Response, Headers}};
 //use http_req::response::Headers;
 use std::net::TcpStream;
 use std::{
@@ -11,7 +11,7 @@ use std::{
         String,
     },
     vec::Vec,
-    io::{Result as IOResult},
+    io::{Result as IOResult, Error, ErrorKind},
     borrow::ToOwned,
 };
 //use std::io::prelude::*;
@@ -44,6 +44,38 @@ lazy_static! {
         }
         Mutex::new(m)
     };
+}
+
+/*
+impl FromStr for Method {
+
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Method, Self::Err> {
+        match input {
+            "GET"  => Ok(Method::GET),
+            "HEAD"  => Ok(Method::HEAD),
+            "POST"  => Ok(Method::POST),
+            "PUT" => Ok(Method::PUT),
+            "DELETE" => Ok(Method::DELETE),
+            "OPTIONS" => Ok(Method::OPTIONS),
+            "PATCH" => Ok(Method::PATCH),
+            _      => Err(()),
+        }
+    }
+}
+*/
+pub fn parse_method(input: &str) -> IOResult<Method>{
+    match input {
+        "GET"  => Ok(Method::GET),
+        "HEAD"  => Ok(Method::HEAD),
+        "POST"  => Ok(Method::POST),
+        "PUT" => Ok(Method::PUT),
+        "DELETE" => Ok(Method::DELETE),
+        "OPTIONS" => Ok(Method::OPTIONS),
+        "PATCH" => Ok(Method::PATCH),
+        _ => Err(Error::new(ErrorKind::Other, "Method could not be parsed!"))
+    }
 }
 
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
@@ -103,7 +135,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
-        println!("DEBUG INFOS: {:?}", req);
+        //println!("DEBUG INFOS: {:?}", req);
 
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
@@ -134,6 +166,7 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
     let response = RequestBuilder::new(&addr)
         .header("Connection", "Keep-Alive")
         .header("Cookie", &get_random_cookie(&req))
+        .method(parse_method(req.method.unwrap()).unwrap())
         .send(&mut stream, &mut writer)
         .unwrap();
     Ok((response, writer))

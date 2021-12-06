@@ -28,7 +28,20 @@ use std::collections::HashMap;
 use std::net;
 use std::net::Shutdown;
 
-use crate::mixnet::{BASE_URL};
+use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
+use crate::mixnet::router;
+
+#[derive(Debug, Clone)]
+pub struct Request<'a> {
+    pub method: Option<&'a str>,
+    pub path: Option<&'a str>,
+    pub version: Option<u8>,
+    pub headers: HashMap<String, String>,
+    pub body: HashMap<String, String>,
+    pub target: Option<String>,
+    pub auth: bool,
+}
+use regex::Regex;
 
 extern crate webpki;
 extern crate rustls;
@@ -42,8 +55,14 @@ use codec::{alloc::string::String};
 use std::{
 	string::ToString,
 };
+use urlencoding::decode;
+//use httparse::*;
+
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
+
+//Router
+//static mut ROUTER: router::Router<()> = router::load_all_routes();
 
 // Which mode the server operates in.
 #[derive(Clone)]
@@ -104,7 +123,6 @@ impl TlsServer {
 
     fn conn_event(&mut self, poll: &mut mio::Poll, event: &mio::event::Event) {
         let token = event.token();
-
         if self.connections.contains_key(&token) {
             self.connections
                 .get_mut(&token)
@@ -167,7 +185,7 @@ impl Connection {
            mode: ServerMode,
            tls_session: rustls::ServerSession)
            -> Connection {
-        let back = open_back(&mode);
+        let back = open_back(&mode); // If Mode not Forward = None
         Connection {
             socket,
             token,
@@ -188,7 +206,7 @@ impl Connection {
         if ev.readiness().is_readable() {
             self.do_tls_read();
             self.try_plain_read();
-            self.try_back_read();
+            self.try_back_read(); // If Mode::Forward -> instant return
         }
 
         if ev.readiness().is_writable() {
@@ -196,8 +214,8 @@ impl Connection {
         }
 
         if self.closing {
-            let _ = self.socket.shutdown(Shutdown::Both);
-            self.close_back();
+            let _ = self.socket.shutdown(Shutdown::Both); // socket teardown
+            self.close_back(); // If Mode::Forward -> close this
             self.closed = true;
         } else {
             self.reregister(poll);
@@ -246,7 +264,7 @@ impl Connection {
     fn try_plain_read(&mut self) {
         // Read and process all available plaintext.
         let mut buf = Vec::new();
-
+        
         let rc = self.tls_session.read_to_end(&mut buf);
         if rc.is_err() {
             error!("plaintext read failed: {:?}", rc);
@@ -293,13 +311,15 @@ impl Connection {
     }
 
     /// Process some amount of received plaintext.
+    /// If we are here, we successfully 1. read some TLS data (do_tls_read) 2. and stored it in buf (try_plain_read)
     fn incoming_plaintext(&mut self, buf: &[u8]) {
         match self.mode {
             ServerMode::Echo => {
                 self.tls_session.write_all(buf).unwrap();
             }
-            ServerMode::Http => {
-                self.send_http_response_once();
+            ServerMode::Http => { // TODO: put in here behaviour after a Request
+                self.handle_request(buf);
+                //self.send_http_response_once();
             }
             ServerMode::Forward(_) => {
                 self.back.as_mut().unwrap().write_all(buf).unwrap();
@@ -307,14 +327,99 @@ impl Connection {
         }
     }
 
+    fn create_request_body(&mut self, buf: &[u8], body_offset: usize, body_to_fill: &mut HashMap<String, String>) {
+        if body_offset < buf.len(){ // only Converting if there is something to do
+            let body_slice = &buf[body_offset..];
+            let body_str = String::from_utf8(body_slice.to_vec()).expect("Body Encoding wrong");
+            let it = body_str.split("&");
+            for i in it {
+                //println!("{:?}", i);
+                let kv:Vec<&str> = i.split("=").collect();
+                let k = kv[0].to_string();
+                let v = String::from(decode(kv[1]).unwrap()); 
+                //println!("DEBUG: VALUE: {}", v);
+                if v!=String::from(""){
+                    body_to_fill.insert(k,v);
+                }
+               
+            }
+            
+        }
+    }
+
+    fn parse_request<'a>(&'a mut self, buf: &'a [u8])->Result<Request, String>{
+        let mut headers = [httparse::EMPTY_HEADER; 64];
+        let mut req = httparse::Request::new(&mut headers);
+        let res = req.parse(buf).unwrap();
+        if res.is_complete(){
+            let mut parsed_req = Request {
+                method: req.method,
+                path: req.path,
+                version: req.version,
+                headers: HashMap::<String,String>::new(),
+                body: HashMap::<String,String>::new(),
+                target: None,
+                auth: false
+            };
+            for i in 0..req.headers.len() { // Adding Headers to Hasmap
+                let h = req.headers[i];
+                let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
+                parsed_req.headers.insert(h.name.to_string(), value);
+            }
+            
+            if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
+                let cookie = parsed_req.headers.get("Cookie").unwrap();
+                let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
+                let target = match cookie_re.captures(cookie.as_str()) {
+                    Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                    _ => None,
+                };
+                parsed_req.target = target;
+                parsed_req.auth = cookie.contains("proxy-auth")
+            }
+            self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
+            //set auth
+            parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
+            Ok(parsed_req)
+        } else {
+            Err(String::from("Request was invalid"))
+        }
+    }
+
+    fn handle_request(&mut self, buf: &[u8]){
+        let res = match self.parse_request(&buf) {
+            Ok(req) => {
+                match req.path {
+                    Some(ref path) => {
+                        router::handle_routes(path, req).unwrap()
+                    },
+                    None => {
+                        router::not_found().unwrap()            
+                    }
+                }
+            },
+            Err(m) => {
+                debug!("[Enclave-TLS-Server-Parsing]: {}", m);
+                router::not_found().unwrap() 
+            } 
+        };
+        self.send_response(res);
+    }
+
+    fn send_response(&mut self, response: Vec<u8>){
+        self.tls_session
+            .write_all(&response)
+            .unwrap();
+    }
+
     fn send_http_response_once(&mut self) {
         let response = b"HTTP/1.0 200 OK\r\nConnection: close\r\n\r\nHello world from server\r\n";
-        if self.sent_http_response {
+        if !self.sent_http_response {
             self.tls_session
                 .write_all(response)
                 .unwrap();
             self.sent_http_response = true;
-            //self.tls_session.send_close_notify();
+            self.tls_session.send_close_notify();
             println!("Returned to client successfully!");
         } else {
             let my_str = "&email=userb@user.com&password=User1234";
@@ -441,8 +546,10 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 #[no_mangle]
 pub extern "C" fn run_server(max_conn: uint8_t) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
-    let cert = "end.fullchain";
-    let key = "end.rsa";
+    //let cert = "end.fullchain";
+    let cert = "localhost.crt"; // TODO: add it to the browser
+    //let key = "end.rsa";
+    let key = "localhost.key";
     //let mode = ServerMode::Echo;
     let mode = ServerMode::Http;
 
@@ -460,6 +567,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
     let mut tlsserv = TlsServer::new(listener, mode, config);
 
     let mut events = mio::Events::with_capacity(256);
+    println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
         poll.poll(&mut events, None)
             .unwrap();

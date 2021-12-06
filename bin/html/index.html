@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Login Sample Page!</title>
+    <script type="text/javascript">
+      function myfunction() {
+        if (true) {
+        // Calling Validation function.
+        //select option value from select tag and storing it in a variable.
+        var x = document.getElementById("form_action").selectedIndex;
+        var action = document.getElementsByTagName("option")[x].value;
+          if (action !== "") {
+            //document.getElementById("form_id").action = "proxy/"+action;
+            setCookie("proxy-target", action, 1);
+            document.getElementById("form_id").submit();
+          } else {
+          alert("Please set form action");
+          }
+        }
+      }
+      function setCookie(cname, cvalue, exhours) {
+        const d = new Date();
+        d.setTime(d.getTime() + (exhours*60*60*1000));
+        let expires = "expires="+ d.toUTCString();
+        document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+      }
+
+
+    </script>
+  </head>
+  <style>
+    .center {
+      margin: 0 auto;
+      width: 300px;
+    }
+    form {
+      margin:0 auto;
+      width:300px
+    }    
+    select {
+      margin-bottom:3px;
+      padding:10px;
+      width: 100%;
+      width: 322px;
+      border:1px solid #CCC
+    }
+    input {
+      margin-bottom:3px;
+      padding:10px;
+      width: 100%;
+      border:1px solid #CCC;
+      max-width: 100%;
+    }
+    button {
+      padding:10px
+    }
+    label {
+      cursor:pointer
+    }
+    .align-margin{
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+  </style>
+  <body>
+    <div class="center">
+      <h1>Hello!</h1>
+      <p>Provide your Credentials and select service</p>
+    </div>
+    <div class="center">
+      <select id="form_action">
+        <option value="">--- Wähle Service ---</option>
+        <option value="test.benelli.dev">test-service</option>
+        <option value="www.blick.ch">blick.ch</option>
+        <option value="www.tagesanzeiger.ch">tagesanzeiger.ch</option>
+        <option value="www.nzz.ch">nzz.ch</option>
+        <option value="www.republik.ch">republik.ch</option>
+        <option value="www.watson.ch">watson.ch</option>
+
+
+
+        </select>
+    </div>
+    <div class="center">
+      <form id='form_id' action="/" method='post'>
+        <input name="username" id="username" type="text" placeholder="Username" required>
+        <input name="password" id="password" type="password" placeholder="Password" required>
+        <p class="align-margin" style="margin-top: 5px; margin-bottom: 8px; width: 20px; padding-left: 18px;">or</p>
+        <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
+        <div style="width: 322px;">
+          <input type='button' value='Login' onclick="myfunction()"/>
+        </div>
+      </form>
+    </div>
+  </body>
+</html>

@@ -550,7 +550,6 @@ dependencies = [
  "sp-std",
  "sp-version",
  "substrate-api-client",
- "tiny-keccak",
  "urlencoding",
  "webpki",
  "webpki-roots 0.21.0 (git+https://github.com/mesalock-linux/webpki-roots?branch=mesalock_sgx)",

@@ -81,14 +81,6 @@ use sp_runtime::traits::Block as BlockT;
 use std::{slice, sync::Arc, vec::Vec};
 use substrate_api_client::compose_extrinsic_offline;
 
-extern crate lazy_static;
-mod mixnet;
-use std::io::Write;
-
-#[macro_use]
-extern crate log;
-
-
 use std::io::Write;
 
 #[macro_use]

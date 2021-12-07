@@ -30,6 +30,12 @@ pub struct Domain{
     pub cookies: Vec<String>,
 }
  
+
+/*
+------------------------
+Helper Funcs and Var
+------------------------
+*/
 lazy_static! {
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
         let urls: Vec<&str> = vec!["test.benelli.dev", "www.blick.ch", "www.tagesanzeiger.ch", "www.nzz.ch", "www.republik.ch", "www.watson.ch"];
@@ -46,25 +52,6 @@ lazy_static! {
     };
 }
 
-/*
-impl FromStr for Method {
-
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<Method, Self::Err> {
-        match input {
-            "GET"  => Ok(Method::GET),
-            "HEAD"  => Ok(Method::HEAD),
-            "POST"  => Ok(Method::POST),
-            "PUT" => Ok(Method::PUT),
-            "DELETE" => Ok(Method::DELETE),
-            "OPTIONS" => Ok(Method::OPTIONS),
-            "PATCH" => Ok(Method::PATCH),
-            _      => Err(()),
-        }
-    }
-}
-*/
 pub fn parse_method(input: &str) -> IOResult<Method>{
     match input {
         "GET"  => Ok(Method::GET),
@@ -77,6 +64,12 @@ pub fn parse_method(input: &str) -> IOResult<Method>{
         _ => Err(Error::new(ErrorKind::Other, "Method could not be parsed!"))
     }
 }
+
+/*
+------------------------
+Proxy Part 
+------------------------
+*/
 
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
     let https_url = create_https_url_from_target_and_route(req);
@@ -148,6 +141,11 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     //Ok(body)
 }
 
+/*
+------------------------
+HTTP Requests
+------------------------
+*/
 
 pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response, Vec<u8>)>{
     let addr: Uri = hostname.parse().unwrap();
@@ -171,6 +169,34 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
         .unwrap();
     Ok((response, writer))
 }
+
+pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>){
+    let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+    let stream = TcpStream::connect(conn_addr).unwrap();
+    let mut stream = tls::Config::default()
+        .connect(addr.host().unwrap_or(""), stream)
+        .unwrap();
+    let mut writer = Vec::new();
+    let mut request = RequestBuilder::new(&addr)
+        .method(method)
+        .body(body.as_bytes()).to_owned();
+        
+    for header in headers {
+        request.header(&header.0, &header.1);
+    };
+    //println!("{:?}", request);
+    let response = request.send(&mut stream, &mut writer).unwrap();
+    //println!("Status: {} {}", response.status_code(), response.reason());
+    println!("{}", String::from_utf8_lossy(&writer));
+
+}
+
+/*
+------------------------
+Cookie Magic
+------------------------
+*/
+
 pub fn get_random_cookie(req: & Request) -> String {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
@@ -186,9 +212,22 @@ pub fn get_random_cookie(req: & Request) -> String {
 }
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
-    insert_cookie_to_target(&req, cookie);
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+    let target: Uri = "https://httpbin.org/headers".parse().unwrap();
+    send_https_request_all_paraemeter(&target, 443, Method::GET, &String::new(), &vec![("Connection", "Close"), ("Cookie", cookie.as_str())]);
+    //insert_cookie_to_target(&req, cookie);
     true
 }
+
+pub fn try_out_cookie_at_target(req: & Request, cookie: String) -> bool {
+    if true {
+        true
+    } else {
+        false
+    }
+}
+
 
 pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let mut map = PROXY_URLS.lock().unwrap();
@@ -199,6 +238,12 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     //println!("Vector now {:?}",  target_domain);
 }
 
+
+/*
+------------------------
+Mutating Response Part 
+------------------------
+*/
 pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
     let target_url =  req.target.as_ref().unwrap();    
     let mut regex_string = String::from("(?:(?:ht|f)tp(?:s?)://|~/|/)?");
@@ -238,6 +283,11 @@ pub fn get_logout_script() -> String {
     format!("{}{}", style, script)
 }
 
+/*
+------------------------
+HTTP Response 
+------------------------
+*/
 pub fn prepare_response(status_line: String, headers: Headers, mut contents: Vec<u8>) ->  IOResult<Vec<u8>>{
     //println!("{:?}", status_line);
     //let status_line = format!("{} {} {}", status.version(), status.code.as_u16(), status.reason());

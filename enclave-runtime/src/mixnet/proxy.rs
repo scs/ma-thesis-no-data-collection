@@ -11,8 +11,11 @@ use std::{
         String,
     },
     vec::Vec,
-    io::{Result as IOResult, Error, ErrorKind},
+    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*,},
     borrow::ToOwned,
+    path::Path,
+    fs::File,
+
 };
 //use std::io::prelude::*;
 use regex::Regex;
@@ -26,7 +29,7 @@ use rand::{Rng};
 #[derive(Clone,Debug)]
 pub struct Domain{
     pub uri: Uri,
-    //pub cookie_name: String,
+    pub cookie_login_check: String,
     pub cookies: Vec<String>,
 }
  
@@ -38,16 +41,18 @@ Helper Funcs and Var
 */
 lazy_static! {
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
-        let urls: Vec<&str> = vec!["test.benelli.dev", "www.blick.ch", "www.tagesanzeiger.ch", "www.nzz.ch", "www.republik.ch", "www.watson.ch"];
         let mut m = HashMap::new();
-        for url in urls {
-            let https_url = format!("https://{}", url);
-            m.insert(String::from(url), Domain{
+        let services = lines_from_file("ma-thesis/services.txt");
+        for service in services {
+            let mut split = service.split(" ");
+            let line =(split.next().unwrap(), split.next().unwrap_or(""));
+            let https_url = format!("https://{}", line.0);
+            m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
-                //cookie_name: String::from("hello"),
+                cookie_login_check: String::from(line.1),
                 cookies: Vec::new(),
             });
-        }
+        };
         Mutex::new(m)
     };
 }
@@ -63,6 +68,14 @@ pub fn parse_method(input: &str) -> IOResult<Method>{
         "PATCH" => Ok(Method::PATCH),
         _ => Err(Error::new(ErrorKind::Other, "Method could not be parsed!"))
     }
+}
+
+fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
+    let file = File::open(filename).expect("no such file");
+    let buf = BufReader::new(file);
+    buf.lines()
+        .map(|l| l.expect("Could not parse line"))
+        .collect()
 }
 
 /*

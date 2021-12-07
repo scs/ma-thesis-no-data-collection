@@ -126,7 +126,7 @@ pub fn not_found()->IOResult<Vec<u8>>{
 }
 
 pub fn get_file_contents(filename: &str) -> IOResult<Vec<u8>> {
-    let html_base_dir = "html";
+    let html_base_dir = "ma-thesis/html";
     let path = format!("{}/{}.html", html_base_dir, filename);
     let contents = io::read_to_string(&path).unwrap();
     //Vec::from(contents.as_bytes())

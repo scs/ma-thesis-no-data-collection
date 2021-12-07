@@ -1,0 +1,6 @@
+test.benelli.dev /my/path
+www.blick.ch /other/path
+www.tagesanzeiger.ch
+www.nzz.ch
+www.republik.ch
+www.watson.ch

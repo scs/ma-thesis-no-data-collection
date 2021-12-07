@@ -1,6 +1,7 @@
-test.benelli.dev https://test.benelli.dev/login/image 302
-www.blick.ch /other/path 302
-www.tagesanzeiger.ch 
-www.nzz.ch https://abo.nzz.ch/benutzerkonto/ 302
-www.republik.ch 
-www.watson.ch
+URI     |       LOGIN_CHECK_URI     |       ANSWER      |
+test.benelli.dev | https://test.benelli.dev/login/image | 302
+www.blick.ch |  | 302
+www.tagesanzeiger.ch |  | 
+www.nzz.ch | https://abo.nzz.ch/benutzerkonto/ | 302
+www.republik.ch |  | 
+www.watson.ch |  | 

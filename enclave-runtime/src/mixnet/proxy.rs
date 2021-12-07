@@ -43,9 +43,9 @@ Helper Funcs and Var
 lazy_static! {
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
         let mut m = HashMap::new();
-        let services = lines_from_file("ma-thesis/services.txt");
+        let services = lines_from_file("ma-thesis/services.txt", 1);
         for service in services {
-            let mut split = service.split(" ");
+            let mut split = service.split(" | ");
             let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             m.insert(String::from(line.0), Domain{
@@ -72,10 +72,11 @@ pub fn parse_method(input: &str) -> IOResult<Method>{
     }
 }
 
-fn lines_from_file(filename: impl AsRef<Path>) -> Vec<String> {
+fn lines_from_file(filename: impl AsRef<Path>, offset: usize) -> Vec<String> {
     let file = File::open(filename).expect("no such file");
     let buf = BufReader::new(file);
     buf.lines()
+        .skip(offset)
         .map(|l| l.expect("Could not parse line"))
         .collect()
 }
@@ -225,10 +226,11 @@ pub fn get_random_cookie(req: & Request) -> String {
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     if try_out_cookie_at_target(req, &cookie) {
-        println!("Cookie Validated, it will now be inserted!");
+        println!("[+] Cookie Validated, it will now be inserted!");
         insert_cookie_to_target(&req, cookie);
         true
     } else {
+        println!("[xxx] Cookie Validation failed");
         false
     }
 }

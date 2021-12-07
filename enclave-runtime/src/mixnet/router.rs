@@ -64,6 +64,7 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         not_found()
                     } else {*/
                         println!("Error, No Cookie was set and : {}", e);
+                        //println!("Debug: sw js {:?}", parsed_req);
                         not_found()
                 }
             }

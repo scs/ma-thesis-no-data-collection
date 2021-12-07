@@ -28,8 +28,9 @@ use rand::{Rng};
 
 #[derive(Clone,Debug)]
 pub struct Domain{
-    pub uri: Uri,
-    pub cookie_login_check: String,
+    pub uri: Uri, 
+    pub login_check_uri: Uri,
+    pub login_check_answer: String,
     pub cookies: Vec<String>,
 }
  
@@ -45,11 +46,12 @@ lazy_static! {
         let services = lines_from_file("ma-thesis/services.txt");
         for service in services {
             let mut split = service.split(" ");
-            let line =(split.next().unwrap(), split.next().unwrap_or(""));
+            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
-                cookie_login_check: String::from(line.1),
+                login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
+                login_check_answer: String::from(line.2),
                 cookies: Vec::new(),
             });
         };
@@ -183,7 +185,7 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
     Ok((response, writer))
 }
 
-pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>){
+pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>) -> IOResult<(Response, Vec<u8>)>{
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     let stream = TcpStream::connect(conn_addr).unwrap();
     let mut stream = tls::Config::default()
@@ -197,11 +199,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     for header in headers {
         request.header(&header.0, &header.1);
     };
-    //println!("{:?}", request);
     let response = request.send(&mut stream, &mut writer).unwrap();
-    //println!("Status: {} {}", response.status_code(), response.reason());
-    println!("{}", String::from_utf8_lossy(&writer));
-
+    Ok((response, writer)) // return response & body
 }
 
 /*
@@ -225,19 +224,25 @@ pub fn get_random_cookie(req: & Request) -> String {
 }
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
-    let mut map = PROXY_URLS.lock().unwrap();
-    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
-    let target: Uri = "https://httpbin.org/headers".parse().unwrap();
-    send_https_request_all_paraemeter(&target, 443, Method::GET, &String::new(), &vec![("Connection", "Close"), ("Cookie", cookie.as_str())]);
-    //insert_cookie_to_target(&req, cookie);
-    true
-}
-
-pub fn try_out_cookie_at_target(req: & Request, cookie: String) -> bool {
-    if true {
+    if try_out_cookie_at_target(req, &cookie) {
+        println!("Cookie Validated, it will now be inserted!");
+        insert_cookie_to_target(&req, cookie);
         true
     } else {
         false
+    }
+}
+
+pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![("Connection", "Close"), ("Cookie", cookie.as_str())]).unwrap();
+    let status_code = response.status_code();
+    match target_domain.login_check_answer.as_str() {
+        "302" if status_code.is_redirect() => {
+            false
+        },
+        _ => true
     }
 }
 
@@ -305,7 +310,7 @@ pub fn prepare_response(status_line: String, headers: Headers, mut contents: Vec
     //println!("{:?}", status_line);
     //let status_line = format!("{} {} {}", status.version(), status.code.as_u16(), status.reason());
     //let status_line = "HTTP/1.1 200 OK";
-    let mut addional_headers = "".to_owned(); //"Location: https://www.blick.ch/ \r\n";
+    let mut addional_headers = "".to_owned();
     for (key, value) in headers.iter() {
         addional_headers += format!("{}:{} \r\n", key, value).as_str();
     };

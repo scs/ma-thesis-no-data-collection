@@ -1,6 +1,6 @@
-test.benelli.dev /my/path
-www.blick.ch /other/path
-www.tagesanzeiger.ch
-www.nzz.ch
-www.republik.ch
+test.benelli.dev https://test.benelli.dev/login/image 302
+www.blick.ch /other/path 302
+www.tagesanzeiger.ch 
+www.nzz.ch https://abo.nzz.ch/benutzerkonto/ 302
+www.republik.ch 
 www.watson.ch

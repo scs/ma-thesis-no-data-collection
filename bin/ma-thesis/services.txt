@@ -5,3 +5,4 @@ www.tagesanzeiger.ch |  |
 www.nzz.ch | https://abo.nzz.ch/benutzerkonto/ | 302
 www.republik.ch |  | 
 www.watson.ch |  | 
+www.youtube.com |  | 

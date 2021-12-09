@@ -335,15 +335,15 @@ impl Connection {
             for i in it {
                 //println!("{:?}", i);
                 let kv:Vec<&str> = i.split("=").collect();
-                let k = kv[0].to_string();
-                let v = String::from(decode(kv[1]).unwrap()); 
-                //println!("DEBUG: VALUE: {}", v);
-                if v!=String::from(""){
-                    body_to_fill.insert(k,v);
+                if kv.len() == 2 {
+                    let k = kv[0].to_string();
+                    let v = String::from(decode(kv[1]).unwrap()); 
+                    //println!("DEBUG: VALUE: {}", v);
+                    if v!=String::from(""){
+                        body_to_fill.insert(k,v);
+                    }
                 }
-               
             }
-            
         }
     }
 
@@ -377,7 +377,10 @@ impl Connection {
                 parsed_req.target = target;
                 parsed_req.auth = cookie.contains("proxy-auth")
             }
-            self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
+            let method = parsed_req.method.unwrap();
+            if method.eq("POST") | method.eq("PUT") | method.eq("PATCH"){
+                self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
+            }
             //set auth
             parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
         

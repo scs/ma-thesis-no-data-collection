@@ -24,7 +24,8 @@ use std::collections::HashMap;
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
-
+//use serde_sgx as serde;
+use serde::{Serialize};
 
 #[derive(Clone,Debug)]
 pub struct Domain{
@@ -81,9 +82,8 @@ fn lines_from_file(filename: impl AsRef<Path>, offset: usize) -> Vec<String> {
         .collect()
 }
 
-fn hashmap_to_string(req: & Request) -> String {
-    //println!("{:?}")
-    String::new()
+fn hashmap_to_string(hashmap: & HashMap<String,String>) -> String {
+   hashmap.iter().map(|(k,v)| format!("{}={}", k,v)).collect::<Vec<String>>().join("&")
 }
 
 /*
@@ -100,7 +100,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
         &target_uri,
         443, 
         parse_method(req.method.unwrap()).unwrap(),
-        &hashmap_to_string(&req),
+        &hashmap_to_string(&req.body),
         &vec![("Connection", "Keep-Alive"), ("Cookie", &get_random_cookie(&req))]
     ).unwrap();
 

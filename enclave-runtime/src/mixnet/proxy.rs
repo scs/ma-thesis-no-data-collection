@@ -24,8 +24,6 @@ use std::collections::HashMap;
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
-//use serde_sgx as serde;
-use serde::{Serialize};
 
 #[derive(Clone,Debug)]
 pub struct Domain{
@@ -85,6 +83,30 @@ fn lines_from_file(filename: impl AsRef<Path>, offset: usize) -> Vec<String> {
 fn hashmap_to_string(hashmap: & HashMap<String,String>) -> String {
    hashmap.iter().map(|(k,v)| format!("{}={}", k,v)).collect::<Vec<String>>().join("&")
 }
+lazy_static! {
+    static ref HEADERS: Vec<String> = {vec![
+        String::from("Accept"),
+        String::from("Accept-Charset"),
+        //String::from("Accept-Encoding"),
+        String::from("Connection"),
+        //String::from("Content-Length") // Will be calculated later
+    ]};
+}
+
+fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
+    let mut forwarded_headers: Vec::<(String, String)> = Vec::new();
+    for header in HEADERS.iter() {
+        match req.headers.get(header) {
+            Some(val) => {forwarded_headers.push((header.to_string(), val.to_string()));},
+            _ => {}
+        }
+    };
+    let cookie = get_random_cookie(&req);
+    if !cookie.eq(&String::from("")){
+        forwarded_headers.push((String::from("Cookie"),cookie));
+    }
+    forwarded_headers
+}
 
 /*
 ------------------------
@@ -95,13 +117,20 @@ Proxy Part
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
     let https_url = create_https_url_from_target_and_route(req);
     let target_uri: Uri = https_url.parse().unwrap();
+    let headers = create_headers_to_forward(&req);
     //let (res, body) = send_https_request(https_url, &req).unwrap();
+    let body = if req.auth {
+        String::new()
+    } else {
+        hashmap_to_string(&req.body)
+    };
     let (res, body) = send_https_request_all_paraemeter(
         &target_uri,
         443, 
         parse_method(req.method.unwrap()).unwrap(),
-        &hashmap_to_string(&req.body),
-        &vec![("Connection", "Keep-Alive"), ("Cookie", &get_random_cookie(&req))]
+        &body,
+        //&vec![("Connection".to_string(), "Keep-Alive".to_string()), ("Cookie".to_string(), get_random_cookie(&req))]
+        &headers
     ).unwrap();
 
     let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
@@ -123,7 +152,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let status_code = res.status_code();
     let version = res.version();
     let reason = res.reason();
-    let content_type = res.headers().get("Content-Type").unwrap();
+    let default_content_type = String::from("text/plain");
+    let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
     headers.insert("Content-Type", content_type);
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
@@ -158,7 +188,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
-        //println!("DEBUG INFOS: {:?}", req);
+        println!("DEBUG INFOS: {:?}", req);
 
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
@@ -177,7 +207,7 @@ HTTP Requests
 ------------------------
 */
 
-pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>) -> IOResult<(Response, Vec<u8>)>{
+pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(String, String)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     //Connect to remote host
@@ -189,14 +219,18 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     //Container for response's body
     let mut writer = Vec::new();
     let mut request = RequestBuilder::new(&addr)
-        .method(method)
-        .body(body.as_bytes()).to_owned();
+        .method(method).to_owned();
+        
         
     // Fill in Headers
-        for header in headers {
+    for header in headers {
         request.header(&header.0, &header.1);
     };
-    let response = request.send(&mut stream, &mut writer).unwrap();
+    //println!("{:?}", request);
+    let response = request.header("Content-Length", &body.as_bytes().len())
+        .body(body.as_bytes())
+        .send(&mut stream, &mut writer)
+        .unwrap();
     Ok((response, writer)) // return response & body
 }
 
@@ -234,7 +268,7 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
 pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
-    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![("Connection", "Close"), ("Cookie", cookie.as_str())]).unwrap();
+    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Close")), (String::from("Cookie"), cookie.to_string())]).unwrap();
     let status_code = response.status_code();
     match target_domain.login_check_answer.as_str() {
         "302" if status_code.is_redirect() => {

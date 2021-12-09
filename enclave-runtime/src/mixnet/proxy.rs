@@ -81,6 +81,11 @@ fn lines_from_file(filename: impl AsRef<Path>, offset: usize) -> Vec<String> {
         .collect()
 }
 
+fn hashmap_to_string(req: & Request) -> String {
+    //println!("{:?}")
+    String::new()
+}
+
 /*
 ------------------------
 Proxy Part 
@@ -95,7 +100,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
         &target_uri,
         443, 
         parse_method(req.method.unwrap()).unwrap(),
-        &String::new(),
+        &hashmap_to_string(&req),
         &vec![("Connection", "Keep-Alive"), ("Cookie", &get_random_cookie(&req))]
     ).unwrap();
 
@@ -147,7 +152,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //println!("Retrying at {:?}", location);
         println!("ERROR: 300-399 Status: {} Requested Path: {} New Location: {}", status_code, req.path.unwrap(), location);
         //headers.insert("Location", HTTPS_BASE_URL);
-        let (res_redirect, body_redirect) = send_https_request(location.to_string(), req).unwrap();
+        let (res_redirect, body_redirect) = send_https_request_all_paraemeter(&(location.to_string().parse().unwrap()), 443, parse_method(req.method.unwrap()).unwrap(),  &String::new(), &Vec::new()).unwrap();
         let (_status_line, _header, body) = handle_response(res_redirect, &body_redirect, req).unwrap();
         body
         //String::from("Redirect").as_bytes().to_vec()

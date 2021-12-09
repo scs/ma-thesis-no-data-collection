@@ -89,7 +89,16 @@ Proxy Part
 
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
     let https_url = create_https_url_from_target_and_route(req);
-    let (res, body) = send_https_request(https_url, &req).unwrap();
+    let target_uri: Uri = https_url.parse().unwrap();
+    //let (res, body) = send_https_request(https_url, &req).unwrap();
+    let (res, body) = send_https_request_all_paraemeter(
+        &target_uri,
+        443, 
+        parse_method(req.method.unwrap()).unwrap(),
+        &String::new(),
+        &vec![("Connection", "Keep-Alive"), ("Cookie", &get_random_cookie(&req))]
+    ).unwrap();
+
     let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
     prepare_response(status_line, headers, body)
 }
@@ -163,9 +172,7 @@ HTTP Requests
 ------------------------
 */
 
-pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response, Vec<u8>)>{
-    let addr: Uri = hostname.parse().unwrap();
-    let port: u16 = 443;
+pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     //Connect to remote host
@@ -176,28 +183,12 @@ pub fn send_https_request(hostname: String, req: &Request) -> IOResult<(Response
         .unwrap();
     //Container for response's body
     let mut writer = Vec::new();
-    //println!("More Debug: auth: {:?}, path: {:?} ", &req.auth, &req.path);
-    let response = RequestBuilder::new(&addr)
-        .header("Connection", "Keep-Alive")
-        .header("Cookie", &get_random_cookie(&req))
-        .method(parse_method(req.method.unwrap()).unwrap())
-        .send(&mut stream, &mut writer)
-        .unwrap();
-    Ok((response, writer))
-}
-
-pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(&str, &str)>) -> IOResult<(Response, Vec<u8>)>{
-    let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-    let stream = TcpStream::connect(conn_addr).unwrap();
-    let mut stream = tls::Config::default()
-        .connect(addr.host().unwrap_or(""), stream)
-        .unwrap();
-    let mut writer = Vec::new();
     let mut request = RequestBuilder::new(&addr)
         .method(method)
         .body(body.as_bytes()).to_owned();
         
-    for header in headers {
+    // Fill in Headers
+        for header in headers {
         request.header(&header.0, &header.1);
     };
     let response = request.send(&mut stream, &mut writer).unwrap();

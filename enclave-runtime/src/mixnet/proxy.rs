@@ -328,37 +328,8 @@ pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
 }
 
 pub fn add_base_tag(content: & String) -> IOResult<String> {
-    //println!("before: {}", content);
     let content = HEAD_REGEX.replace_all(&content, REPLACE_HEAD_WITH.as_str());
-    //println!("after: {}", content);
-
-    /*
-    let regex = Regex::new("(?i)<head>").unwrap();
-    let mut replace_with = String::from("<head> \n <base href=\"");
-    replace_with += HTTPS_BASE_URL;
-    replace_with += &String::from("/\"/> <meta charset=\"utf-8\">");
-    replace_with += &get_logout_script();
-
-    let content = regex.replace_all(&content, replace_with.as_str());*/
-    //println!("Regexstring: {:?} and replace it with: {}", *HEAD_REGEX, REPLACE_HEAD_WITH.to_string());
     Ok(String::from(content))
-}
-
-pub fn get_logout_script() -> String {
-    let style = "<style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>";
-    let script = "<script type=\"text/javascript\"> 
-    window.onload = function () {
-        let btn = document.createElement(\"button\");
-        btn.className += \"proxy_target_logout\";
-        btn.innerHTML = \"Cancel this session\";
-        btn.addEventListener(\"click\", function () {
-            document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-            window.location.href = '/';
-        });
-        document.body.prepend(btn);
-      }
-      </script>";
-    format!("{}{}", style, script)
 }
 
 /*

@@ -31,6 +31,8 @@ pub struct Domain{
     pub login_check_uri: Uri,
     pub login_check_answer: String,
     pub cookies: Vec<String>,
+    pub regex_uri: Regex,
+    pub regex_uri_extended: Regex, 
 }
  
 
@@ -47,11 +49,17 @@ lazy_static! {
             let mut split = service.split(" | ");
             let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
+            let base_regex = Regex::new(line.0).unwrap();
+            let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/)?{}", line.0).as_str()).unwrap();
+        
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
                 login_check_answer: String::from(line.2),
                 cookies: Vec::new(),
+                regex_uri: base_regex,
+                regex_uri_extended: exended_base_regex,
+
             });
         };
         Mutex::new(m)
@@ -76,6 +84,12 @@ lazy_static! {
         </script>";
         format!("{}{}{}\n{}\n{}\n", head_base, HTTPS_BASE_URL, base_char, style, script)
     };
+}
+
+pub fn get_target_domain<'a>(req: &'a  Request)-> Domain {
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+    target_domain.clone()
 }
 
 pub fn parse_method(input: &str) -> IOResult<Method>{
@@ -181,7 +195,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         if content_type.contains("text") || content_type.contains("application") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
-                    let mut clean = clean_urls(&body_string, &req).unwrap(); // URL changement to LOCALHOST
+                    let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
                     clean = if content_type.contains("html"){
                         add_base_tag(&clean).unwrap()
                     } else {
@@ -315,16 +329,15 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
 Mutating Response Part 
 ------------------------
 */
-pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
-    let target_url =  req.target.as_ref().unwrap();    
-    //let mut regex_string = String::from("(?:(?:ht|f)tp(?:s?)://|~/|/)?");
-    let mut regex_string = String::new();
-    regex_string += target_url;
-    let re = Regex::new(regex_string.as_str()).unwrap(); 
-    let replace_with = String::from(BASE_LOCALHOST_URL);
-    let content = re.replace_all(&content, replace_with.as_str());
-    //println!("Replacing: {} with {}", regex_string, replace_with);
-    Ok(String::from(content))
+pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> IOResult<String> {
+    let target_domain = get_target_domain(req);
+    let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
+    let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
+    Ok(extended_modified_content)
+}
+
+pub fn regex_replace_all_wrapper(regex: &Regex, text: &String, replace_with: &String)-> String {
+    String::from(regex.replace_all(&text, replace_with.as_str()))
 }
 
 pub fn add_base_tag(content: & String) -> IOResult<String> {

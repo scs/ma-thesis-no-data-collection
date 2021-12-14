@@ -19,7 +19,7 @@ use std::{
 };
 //use std::io::prelude::*;
 use regex::Regex;
-use crate::mixnet::{HTTPS_BASE_URL};
+use crate::mixnet::{HTTPS_BASE_URL, BASE_LOCALHOST_URL};
 use std::collections::HashMap;
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
@@ -56,6 +56,26 @@ lazy_static! {
         };
         Mutex::new(m)
     };
+    static ref HEAD_REGEX: Regex = Regex::new("(?i)<head>").unwrap();
+    
+    static ref REPLACE_HEAD_WITH: String = {
+        let head_base = "<head> \n <base href=\"";
+        let base_char = "/\"/>  \n <meta charset=\"utf-8\">";
+        let style = "<style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>";
+        let script = "<script type=\"text/javascript\"> 
+        window.onload = function () {
+            let btn = document.createElement(\"button\");
+            btn.className += \"proxy_target_logout\";
+            btn.innerHTML = \"Cancel this session\";
+            btn.addEventListener(\"click\", function () {
+                document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
+                window.location.href = '/';
+            });
+            document.body.prepend(btn);
+        }
+        </script>";
+        format!("{}{}{}\n{}\n{}\n", head_base, HTTPS_BASE_URL, base_char, style, script)
+    };
 }
 
 pub fn parse_method(input: &str) -> IOResult<Method>{
@@ -89,6 +109,7 @@ lazy_static! {
         String::from("Accept-Charset"),
         //String::from("Accept-Encoding"),
         String::from("Connection"),
+        String::from("Access-Control-Allow-Origin"),
         //String::from("Content-Length") // Will be calculated later
     ]};
 }
@@ -296,23 +317,30 @@ Mutating Response Part
 */
 pub fn clean_urls(content: & String, req: & Request) -> IOResult<String> {
     let target_url =  req.target.as_ref().unwrap();    
-    let mut regex_string = String::from("(?:(?:ht|f)tp(?:s?)://|~/|/)?");
+    //let mut regex_string = String::from("(?:(?:ht|f)tp(?:s?)://|~/|/)?");
+    let mut regex_string = String::new();
     regex_string += target_url;
     let re = Regex::new(regex_string.as_str()).unwrap(); 
-    let replace_with = String::from(HTTPS_BASE_URL);
+    let replace_with = String::from(BASE_LOCALHOST_URL);
     let content = re.replace_all(&content, replace_with.as_str());
+    //println!("Replacing: {} with {}", regex_string, replace_with);
     Ok(String::from(content))
 }
 
 pub fn add_base_tag(content: & String) -> IOResult<String> {
+    //println!("before: {}", content);
+    let content = HEAD_REGEX.replace_all(&content, REPLACE_HEAD_WITH.as_str());
+    //println!("after: {}", content);
+
+    /*
     let regex = Regex::new("(?i)<head>").unwrap();
     let mut replace_with = String::from("<head> \n <base href=\"");
     replace_with += HTTPS_BASE_URL;
     replace_with += &String::from("/\"/> <meta charset=\"utf-8\">");
     replace_with += &get_logout_script();
-    //println!("Regexstring: {} and replace it with: {}", regex, replace_with);
 
-    let content = regex.replace_all(&content, replace_with.as_str());
+    let content = regex.replace_all(&content, replace_with.as_str());*/
+    //println!("Regexstring: {:?} and replace it with: {}", *HEAD_REGEX, REPLACE_HEAD_WITH.to_string());
     Ok(String::from(content))
 }
 

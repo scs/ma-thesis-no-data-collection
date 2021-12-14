@@ -318,8 +318,15 @@ impl Connection {
                 self.tls_session.write_all(buf).unwrap();
             }
             ServerMode::Http => { // TODO: put in here behaviour after a Request
+                /*
+                let before_time = std::time::Instant::now();
+                println!{"Connection: {:?} starting req", self.token};
                 self.handle_request(buf);
-                //self.send_http_response_once();
+                println!{"Connection: {:?} finished req after {:#?}", self.token, before_time.elapsed()};
+
+                //self.send_http_response_once();*/
+
+                self.handle_request(buf);
             }
             ServerMode::Forward(_) => {
                 self.back.as_mut().unwrap().write_all(buf).unwrap();
@@ -350,44 +357,52 @@ impl Connection {
     fn parse_request<'a>(&'a mut self, buf: &'a [u8])->Result<Request, String>{
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
-        let res = req.parse(buf).unwrap();
-        if res.is_complete(){
-            let mut parsed_req = Request {
-                method: req.method,
-                path: req.path,
-                version: req.version,
-                headers: HashMap::<String,String>::new(),
-                body: HashMap::<String,String>::new(),
-                target: None,
-                auth: false
-            };
-            for i in 0..req.headers.len() { // Adding Headers to Hasmap
-                let h = req.headers[i];
-                let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
-                parsed_req.headers.insert(h.name.to_string(), value);
+        let res = req.parse(buf);
+        match res {
+            Ok(status)=> {
+                if status.is_complete(){
+                    let mut parsed_req = Request {
+                        method: req.method,
+                        path: req.path,
+                        version: req.version,
+                        headers: HashMap::<String,String>::new(),
+                        body: HashMap::<String,String>::new(),
+                        target: None,
+                        auth: false
+                    };
+                    for i in 0..req.headers.len() { // Adding Headers to Hasmap
+                        let h = req.headers[i];
+                        let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
+                        parsed_req.headers.insert(h.name.to_string(), value);
+                    }
+                    
+                    if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
+                        let cookie = parsed_req.headers.get("Cookie").unwrap();
+                        let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
+                        let target = match cookie_re.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.target = target;
+                        parsed_req.auth = cookie.contains("proxy-auth")
+                    }
+                    let method = parsed_req.method.unwrap();
+                    if method.eq("POST") | method.eq("PUT") | method.eq("PATCH"){
+                        self.create_request_body(&buf, status.unwrap(), &mut parsed_req.body);
+                    }
+                    //set auth
+                    parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
+                
+                    Ok(parsed_req)
+                } else {
+                    Err(String::from("Request was incomplete"))
+                }
+            },
+            _ => {
+                Err(String::from("Couldn't parse the Request"))
             }
-            
-            if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
-                let cookie = parsed_req.headers.get("Cookie").unwrap();
-                let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
-                let target = match cookie_re.captures(cookie.as_str()) {
-                    Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
-                    _ => None,
-                };
-                parsed_req.target = target;
-                parsed_req.auth = cookie.contains("proxy-auth")
-            }
-            let method = parsed_req.method.unwrap();
-            if method.eq("POST") | method.eq("PUT") | method.eq("PATCH"){
-                self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
-            }
-            //set auth
-            parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
-        
-            Ok(parsed_req)
-        } else {
-            Err(String::from("Request was invalid"))
         }
+        //let res = req.parse(buf).unwrap();
     }
 
     fn handle_request(&mut self, buf: &[u8]){
@@ -404,7 +419,7 @@ impl Connection {
             },
             Err(m) => {
                 debug!("[Enclave-TLS-Server-Parsing]: {}", m);
-                router::not_found().unwrap() 
+                router::internal_server_error().unwrap() 
             } 
         };
         self.send_response(res);

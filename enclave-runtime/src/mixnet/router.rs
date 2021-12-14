@@ -10,6 +10,7 @@ const STATUS_LINE_OK: &str = "HTTP/1.1 200 OK";
 //const STATUS_LINE_REDIRECT: &str = "HTTP/1.1 301 OK";
 const STATUS_LINE_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
 const STATUS_LINE_UNAUTHORIZED: &str = "HTTP/1.1 401 UNAUTHORIZED";
+const STATUS_LINE_INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR";
 
 //const STATUS_LINE_SERVER_ERROR: &str = "HTTP/1.1 500 OK";
 use http_req::response::{Headers};
@@ -124,6 +125,11 @@ pub fn not_authorized()->IOResult<Vec<u8>>{
 pub fn not_found()->IOResult<Vec<u8>>{
     let contents = get_file_contents("404").unwrap();
     prepare_response(STATUS_LINE_NOT_FOUND, Headers::new(), contents)
+}
+
+pub fn internal_server_error()->IOResult<Vec<u8>>{
+    let contents = get_file_contents("500").unwrap();
+    prepare_response(STATUS_LINE_INTERNAL_SERVER_ERROR, Headers::new(), contents)
 }
 
 pub fn get_file_contents(filename: &str) -> IOResult<Vec<u8>> {

@@ -22,6 +22,8 @@ pub mod proxy;
 pub mod router;
 
 pub const BASE_URL: &str = "127.0.0.1:8443"; 
+pub const BASE_LOCALHOST_URL: &str = "localhost:8443"; 
+
 pub const HTTPS_BASE_URL: &str = "https://localhost:8443"; 
 
 pub fn start_tls_server(){

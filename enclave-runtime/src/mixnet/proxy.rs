@@ -33,6 +33,7 @@ pub struct Domain{
     pub cookies: Vec<String>,
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
+    pub regex_subdomains: Regex, 
 }
  
 
@@ -46,12 +47,13 @@ lazy_static! {
         let mut m = HashMap::new();
         let services = lines_from_file("ma-thesis/services.txt", 1);
         for service in services {
-            let mut split = service.split(" | ");
-            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""));
+            let mut split = service.split(" || ");
+            //Attention: this must be adapted for each new column
+            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/)?{}", line.0).as_str()).unwrap();
-        
+            let subdomains_regex = Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?{})", line.3).as_str()).unwrap();
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -59,7 +61,7 @@ lazy_static! {
                 cookies: Vec::new(),
                 regex_uri: base_regex,
                 regex_uri_extended: exended_base_regex,
-
+                regex_subdomains: subdomains_regex,
             });
         };
         Mutex::new(m)
@@ -150,8 +152,7 @@ Proxy Part
 */
 
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
-    let https_url = create_https_url_from_target_and_route(req);
-    let target_uri: Uri = https_url.parse().unwrap();
+    let target_uri = parse_target_uri(&req);
     let headers = create_headers_to_forward(&req);
     //let (res, body) = send_https_request(https_url, &req).unwrap();
     let body = if req.auth {
@@ -170,6 +171,16 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
 
     let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
     prepare_response(status_line, headers, body)
+}
+
+pub fn parse_target_uri(req: & Request) -> Uri {
+    let regex = Regex::new("proxy_sub=(.*)").unwrap();
+    let path = req.path.unwrap();
+    let https_url = match regex.captures(path) {
+        Some(res) => {res.get(1).unwrap().as_str().to_string()},
+        _ => {create_https_url_from_target_and_route(req)}
+    };
+    https_url.parse().unwrap()
 }
 
 pub fn create_https_url_from_target_and_route(req: & Request) -> String {
@@ -223,7 +234,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
-        println!("DEBUG INFOS: {:?}", req);
+        //println!("DEBUG INFOS: {:?}", req);
 
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
@@ -333,7 +344,8 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
     let target_domain = get_target_domain(req);
     let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
     let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
-    Ok(extended_modified_content)
+    let sub_domain_cleand = regex_replace_all_wrapper(&target_domain.regex_subdomains, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL));
+    Ok(sub_domain_cleand)
 }
 
 pub fn regex_replace_all_wrapper(regex: &Regex, text: &String, replace_with: &String)-> String {

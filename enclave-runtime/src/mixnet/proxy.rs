@@ -33,7 +33,7 @@ pub struct Domain{
     pub cookies: Vec<String>,
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
-    pub regex_subdomains: Regex, 
+    pub regex_subdomains: Option<Regex>, 
 }
  
 
@@ -53,7 +53,7 @@ lazy_static! {
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/)?{}", line.0).as_str()).unwrap();
-            let subdomains_regex = Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?{})", line.3).as_str()).unwrap();
+            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?{})", line.3).as_str()).unwrap())};
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -66,7 +66,7 @@ lazy_static! {
         };
         Mutex::new(m)
     };
-    static ref HEAD_REGEX: Regex = Regex::new("(?i)<head>").unwrap();
+    static ref HEAD_REGEX: Regex = Regex::new("(?i)<head?[^>]>").unwrap();
     
     static ref REPLACE_HEAD_WITH: String = {
         let head_base = "<head> \n <base href=\"";
@@ -207,6 +207,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
+                    
                     clean = if content_type.contains("html"){
                         add_base_tag(&clean).unwrap()
                     } else {
@@ -228,10 +229,11 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //println!("Retrying at {:?}", location);
         println!("ERROR: 300-399 Status: {} Requested Path: {} New Location: {}", status_code, req.path.unwrap(), location);
         //headers.insert("Location", HTTPS_BASE_URL);
+        /*
         let (res_redirect, body_redirect) = send_https_request_all_paraemeter(&(location.to_string().parse().unwrap()), 443, parse_method(req.method.unwrap()).unwrap(),  &String::new(), &Vec::new()).unwrap();
         let (_status_line, _header, body) = handle_response(res_redirect, &body_redirect, req).unwrap();
-        body
-        //String::from("Redirect").as_bytes().to_vec()
+        body*/
+        String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
         //println!("DEBUG INFOS: {:?}", req);
@@ -344,7 +346,10 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
     let target_domain = get_target_domain(req);
     let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
     let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
-    let sub_domain_cleand = regex_replace_all_wrapper(&target_domain.regex_subdomains, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL));
+    let sub_domain_cleand = if let Some(sub_regex) = target_domain.regex_subdomains {
+        regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+    } else {extended_modified_content};
+    
     Ok(sub_domain_cleand)
 }
 

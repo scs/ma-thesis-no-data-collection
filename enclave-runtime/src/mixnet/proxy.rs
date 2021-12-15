@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
+use cookie::Cookie;
 
 #[derive(Clone,Debug)]
 pub struct Domain{
@@ -35,6 +36,7 @@ pub struct Domain{
     pub regex_uri_extended: Regex, 
     pub regex_subdomains: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
+    pub auth_user: HashMap<String,String>
  
 }
  
@@ -66,6 +68,7 @@ lazy_static! {
                 regex_uri_extended: exended_base_regex,
                 regex_subdomains: subdomains_regex,
                 regex_general_subdomains: all_subdomains_regex,
+                auth_user: HashMap::new(),
             });
         };
         Mutex::new(m)

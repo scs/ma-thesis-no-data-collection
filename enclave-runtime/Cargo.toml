@@ -78,6 +78,7 @@ route-recognizer = {git = "https://github.com/allanbenelli/route-recognizer-sgx"
 #cookie = "0.15"
 urlencoding =  {git = "https://github.com/allanbenelli/rust_urlencoding-sgx.git", branch="sgx"}
 threadpool = {tag="sgx_1.1.3", git="https://github.com/mesalock-linux/rust-threadpool-sgx"}
+cookie = { git="https://github.com/allanbenelli/cookie-rs-sgx.git", branch="sgx"}
 
 # for attestation
 chrono = { git = "https://github.com/mesalock-linux/chrono-sgx" }

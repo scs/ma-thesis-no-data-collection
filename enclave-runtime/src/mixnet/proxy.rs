@@ -33,7 +33,9 @@ pub struct Domain{
     pub cookies: Vec<String>,
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
-    pub regex_subdomains: Option<Regex>, 
+    pub regex_subdomains: Option<Regex>,
+    pub regex_general_subdomains: Option<Regex>, 
+ 
 }
  
 
@@ -49,11 +51,12 @@ lazy_static! {
         for service in services {
             let mut split = service.split(" || ");
             //Attention: this must be adapted for each new column
-            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
+            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/)?{}", line.0).as_str()).unwrap();
-            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?{})", line.3).as_str()).unwrap())};
+            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?({}))", line.3).as_str()).unwrap())};
+            let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -62,6 +65,7 @@ lazy_static! {
                 regex_uri: base_regex,
                 regex_uri_extended: exended_base_regex,
                 regex_subdomains: subdomains_regex,
+                regex_general_subdomains: all_subdomains_regex,
             });
         };
         Mutex::new(m)
@@ -227,20 +231,22 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     } else if status_code.is_redirect() { // 300 - 399 Redirect // Intercept it and reset Cookie
         let location = res.headers().get("Location").unwrap();
         //println!("Retrying at {:?}", location);
-        println!("ERROR: 300-399 Status: {} Requested Path: {} New Location: {}", status_code, req.path.unwrap(), location);
-        //headers.insert("Location", HTTPS_BASE_URL);
+        let cleaned_loc = clean_urls(location, &req, &BASE_LOCALHOST_URL.to_string()).unwrap();
+
+        println!("ERROR-{}: Requested Path: {} New Location: {} cleaned location: {}", status_code, req.path.unwrap(), location, cleaned_loc);
+        headers.insert("Location", &cleaned_loc);
         /*
         let (res_redirect, body_redirect) = send_https_request_all_paraemeter(&(location.to_string().parse().unwrap()), 443, parse_method(req.method.unwrap()).unwrap(),  &String::new(), &Vec::new()).unwrap();
         let (_status_line, _header, body) = handle_response(res_redirect, &body_redirect, req).unwrap();
         body*/
         String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
-        println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
+        println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         //println!("DEBUG INFOS: {:?}", req);
 
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
-        println!("ERROR: Status: {} Requested Path: {}", status_code, req.path.unwrap());
+        println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         String::from("500").as_bytes().to_vec()
     };
     let status_line = format!("{} {} {}", version, status_code, reason);
@@ -348,7 +354,14 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
     let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
     let sub_domain_cleand = if let Some(sub_regex) = target_domain.regex_subdomains {
         regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
-    } else {extended_modified_content};
+    } else {
+        extended_modified_content
+        /*
+        if let Some(general_sub) = target_domain.regex_general_subdomains {
+            regex_replace_all_wrapper(&general_sub, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+        } else {extended_modified_content}
+        */
+    };
     
     Ok(sub_domain_cleand)
 }

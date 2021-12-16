@@ -27,11 +27,11 @@ use rand::{Rng};
 use cookie::Cookie;
 
 #[derive(Clone,Debug)]
-pub struct Domain{
+pub struct Domain <'a> {
     pub uri: Uri, 
     pub login_check_uri: Uri,
     pub login_check_answer: String,
-    pub cookies: Vec<String>,
+    pub cookies: Vec<Cookie<'a>>,
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
     pub regex_subdomains: Option<Regex>,
@@ -47,7 +47,7 @@ Helper Funcs and Var
 ------------------------
 */
 lazy_static! {
-    static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
+    static ref PROXY_URLS: Mutex<HashMap<String, Domain<'static>>> = {
         let mut m = HashMap::new();
         let services = lines_from_file("ma-thesis/services.txt", 1);
         for service in services {
@@ -95,7 +95,7 @@ lazy_static! {
     };
 }
 
-pub fn get_target_domain<'a>(req: &'a  Request)-> Domain {
+pub fn get_target_domain<'a>(req: &'a  Request)-> Domain<'a> {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     target_domain.clone()
@@ -304,7 +304,7 @@ pub fn get_random_cookie(req: & Request) -> String {
     let cookies = &target_domain.cookies;
     if cookies.len()>0 {
         let index = rand::thread_rng().gen_range(0, cookies.len());
-        String::from(&cookies[index])
+        cookies[index].to_string()
     } else {String::from("")}
 
     //String::from("s: &str")
@@ -340,8 +340,10 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
-    //println!("{} will be inserted to {:?}", cookie, target_domain);
-    target_domain.cookies.push(cookie);
+    //println!("{} will be inserted to {:?}", cookie, target_domain);  
+    let cookie_decoded = cookie.clone().replace("+", " ");
+    target_domain.cookies.push(Cookie::parse(cookie_decoded).unwrap());
+
     //println!("Vector now {:?}",  target_domain);
 }
 

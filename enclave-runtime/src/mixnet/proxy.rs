@@ -349,7 +349,9 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     //target_domain.cookies.push(String::from("hello"));
     //println!("{} will be inserted to {:?}", cookie, target_domain);  
     let cookie_decoded = cookie.clone().replace("+", " ");
-    target_domain.cookies.push(Cookie::parse(cookie_decoded).unwrap());
+    let parsed_cookie = Cookie::parse(cookie_decoded).unwrap();
+    target_domain.auth_user.insert(req.uuid.as_ref().unwrap().to_string(), parsed_cookie.value().to_string());
+    target_domain.cookies.push(parsed_cookie);
 
     //println!("Vector now {:?}",  target_domain);
 }

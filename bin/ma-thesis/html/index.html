@@ -2,22 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Login Sample Page!</title>
+    <title> Proxy Login Page!</title>
+    <script src="https://unpkg.com/uuid@latest/dist/umd/uuidv4.min.js"></script>
     <script type="text/javascript">
-      function myfunction() {
-        if (true) {
-        // Calling Validation function.
-        //select option value from select tag and storing it in a variable.
-        var x = document.getElementById("form_action").selectedIndex;
-        var action = document.getElementsByTagName("option")[x].value;
-          if (action !== "") {
-            //document.getElementById("form_id").action = "proxy/"+action;
-            setCookie("proxy-target", action, 1);
-            document.getElementById("form_id").submit();
-          } else {
-          alert("Please set form action");
-          }
+      function setProxyTarget() {
+       //select option value from select tag and storing it in a variable.
+      var x = document.getElementById("form_action").selectedIndex;
+      var action = document.getElementsByTagName("option")[x].value;
+        if (action !== "") {
+          //document.getElementById("form_id").action = "proxy/"+action;
+          updateUUID();
+          setCookie("proxy-target", action, 1);
+          document.getElementById("form_id").submit();
+        } else {
+        alert("Please set form action");
         }
+        
       }
       function setCookie(cname, cvalue, exhours) {
         const d = new Date();
@@ -25,6 +25,34 @@
         let expires = "expires="+ d.toUTCString();
         document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
       }
+      
+      function updateUUID(){
+        var cname = "proxy-uuid";
+        var cookie = getCookie(cname);
+        if (cookie === null){
+          //alert("cookie not found");
+          cookie = uuidv4();
+        }
+        setCookie(cname, cookie, 1); //  @TODO: Reset this value
+      }
+
+      function getCookie(name) {
+        var dc = document.cookie;
+        var prefix = name + "=";
+        var begin = dc.indexOf("; " + prefix);
+        if (begin === -1) {
+            begin = dc.indexOf(prefix);
+            if (begin !== 0) return null;
+        }
+        else{
+            begin += 2;
+            var end = document.cookie.indexOf(";", begin);
+            if (end === -1) {
+            end = dc.length;
+            }
+        }
+        return decodeURI(dc.substring(begin + prefix.length, end));
+    } 
 
 
     </script>
@@ -91,7 +119,7 @@
         <p class="align-margin" style="margin-top: 5px; margin-bottom: 8px; width: 20px; padding-left: 18px;">or</p>
         <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
         <div style="width: 322px;">
-          <input type='button' value='Login' onclick="myfunction()"/>
+          <input type='button' value='Login' onclick="setProxyTarget()"/>
         </div>
       </form>
     </div>

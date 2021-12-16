@@ -609,7 +609,11 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
                         break 'outer;
                     }
                 }
-                _ => tlsserv.conn_event(&mut poll, &event)
+                _ => {
+                    
+                    tlsserv.conn_event(&mut poll, &event);
+                    
+                }
             }
         }
     }

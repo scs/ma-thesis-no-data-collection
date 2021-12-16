@@ -71,12 +71,12 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
             }
         },
         Some(_target) => {
-            println!("Need to check authentication here: {}", proxy::check_auth_for_request(&parsed_req));
-            if parsed_req.auth_req {
+            //println!("Need to check authentication here: {}", proxy::check_auth_for_request(&parsed_req));
+            if parsed_req.auth_req || !proxy::check_auth_for_request(&parsed_req) {
                 parsed_req.method = Some("GET");
                 //println!("Parsed_Req: {:?}", parsed_req.method);
                 if parsed_req.body.contains_key("cookie"){
-                    let cookie = parsed_req.body.get("cookie").unwrap();
+                    let cookie = parsed_req.body.remove("cookie").unwrap();
                     println!("Validating Cookie");
                     if proxy::cookie_is_valid(&parsed_req, cookie.to_string()) {
                         proxy(parsed_req)
@@ -86,8 +86,7 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                     //not_authorized()
                 }
                 //proxy(parsed_req)
-            } else {
-                //not_authorized()
+            } else { // check for auth was successfull or else atuh_Req
                 proxy(parsed_req)
             }
             /*

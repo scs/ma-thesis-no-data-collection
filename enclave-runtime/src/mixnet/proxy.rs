@@ -135,16 +135,28 @@ lazy_static! {
         String::from("Access-Control-Allow-Origin"),
         //String::from("Content-Length") // Will be calculated later
     ]};
+
+    static ref DEFAULT_HEADERS: Vec<(String,String)> = {vec![
+        (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"))
+    ]};
 }
 
 fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
-    let mut forwarded_headers: Vec::<(String, String)> = Vec::new();
+    let mut forwarded_headers: Vec::<(String, String)> = DEFAULT_HEADERS.clone();
     for header in HEADERS.iter() {
         match req.headers.get(header) {
             Some(val) => {forwarded_headers.push((header.to_string(), val.to_string()));},
             _ => {}
         }
     };
+    /*
+    for header in DEFAULT_HEADERS.iter() {
+        forwarded_headers.push()
+        match req.headers.get(header) {
+            Some(val) => {forwarded_headers.push((key.to_string(), header..to_string()));},
+            _ => {}
+        }
+    };*/
     let cookie = get_random_cookie(&req);
     if !cookie.eq(&String::from("")){
         forwarded_headers.push((String::from("Cookie"),cookie));
@@ -253,7 +265,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         //println!("DEBUG INFOS: {:?}", req);
-
+        //println!("Response: {:?}", String::from_utf8(&body_original));
+        //body_original.to_vec()
         String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
@@ -291,10 +304,13 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         request.header(&header.0, &header.1);
     };
     //println!("{:?}", request);
-    let response = request.header("Content-Length", &body.as_bytes().len())
-        .body(body.as_bytes())
-        .send(&mut stream, &mut writer)
+
+    request.header("Content-Length", &body.as_bytes().len())
+        .body(body.as_bytes());
+    //println!("{:?}", addr.path());
+    let response = request.send(&mut stream, &mut writer)
         .unwrap();
+    //println!("Returned from here");
     Ok((response, writer)) // return response & body
 }
 

@@ -39,7 +39,8 @@ pub struct Request<'a> {
     pub headers: HashMap<String, String>,
     pub body: HashMap<String, String>,
     pub target: Option<String>,
-    pub auth: bool,
+    pub uuid: Option<String>,
+    pub auth_req: bool,
 }
 use regex::Regex;
 
@@ -368,7 +369,8 @@ impl Connection {
                         headers: HashMap::<String,String>::new(),
                         body: HashMap::<String,String>::new(),
                         target: None,
-                        auth: false
+                        uuid: None,
+                        auth_req: false
                     };
                     for i in 0..req.headers.len() { // Adding Headers to Hasmap
                         let h = req.headers[i];
@@ -384,14 +386,14 @@ impl Connection {
                             _ => None,
                         };
                         parsed_req.target = target;
-                        parsed_req.auth = cookie.contains("proxy-auth")
+                        //parsed_req.auth = cookie.contains("proxy-auth")
                     }
                     let method = parsed_req.method.unwrap();
                     if method.eq("POST") | method.eq("PUT") | method.eq("PATCH"){
                         self.create_request_body(&buf, status.unwrap(), &mut parsed_req.body);
                     }
-                    //set auth
-                    parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
+                    //set auth_req
+                    parsed_req.auth_req = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
                 
                     Ok(parsed_req)
                 } else {

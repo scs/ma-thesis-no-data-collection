@@ -71,7 +71,7 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
             }
         },
         Some(_target) => {
-            if parsed_req.auth {
+            if parsed_req.auth_req {
                 parsed_req.method = Some("GET");
                 //println!("Parsed_Req: {:?}", parsed_req.method);
                 //println!("Need to check authentication here and change method for proxy");

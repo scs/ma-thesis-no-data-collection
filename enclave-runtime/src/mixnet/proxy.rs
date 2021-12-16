@@ -157,7 +157,6 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
 Proxy Part 
 ------------------------
 */
-
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
     let target_uri = parse_target_uri(&req);
     let headers = create_headers_to_forward(&req);
@@ -178,6 +177,14 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
 
     let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
     prepare_response(status_line, headers, body)
+}
+
+pub fn check_auth_for_request(req: & Request) -> bool {
+    if let Some(uuid) = &req.uuid {
+        let domain = get_target_domain(req);
+        return domain.auth_user.contains_key(uuid)
+    } else {return false};
+    
 }
 
 pub fn parse_target_uri(req: & Request) -> Uri {

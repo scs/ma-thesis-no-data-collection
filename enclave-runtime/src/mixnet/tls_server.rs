@@ -380,12 +380,18 @@ impl Connection {
                     
                     if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
                         let cookie = parsed_req.headers.get("Cookie").unwrap();
-                        let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
-                        let target = match cookie_re.captures(cookie.as_str()) {
+                        let cookie_target = Regex::new("proxy-target=([^;]*)").unwrap();
+                        let target = match cookie_target.captures(cookie.as_str()) {
                             Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
                             _ => None,
                         };
                         parsed_req.target = target;
+                        let cookie_uuid = Regex::new("proxy-uuid=([^;]*)").unwrap();
+                        let uuid = match cookie_uuid.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.uuid = uuid;
                         //parsed_req.auth = cookie.contains("proxy-auth")
                     }
                     let method = parsed_req.method.unwrap();

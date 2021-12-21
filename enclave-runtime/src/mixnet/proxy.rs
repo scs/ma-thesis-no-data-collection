@@ -259,6 +259,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
 
         println!("ERROR-{}: Requested Path: {} New Location: {} cleaned location: {}", status_code, req.path.unwrap(), location, cleaned_loc);
         headers.insert("Location", &cleaned_loc);
+        headers.insert("Cache-Control", "no-cache");
         /*
         let (res_redirect, body_redirect) = send_https_request_all_paraemeter(&(location.to_string().parse().unwrap()), 443, parse_method(req.method.unwrap()).unwrap(),  &String::new(), &Vec::new()).unwrap();
         let (_status_line, _header, body) = handle_response(res_redirect, &body_redirect, req).unwrap();

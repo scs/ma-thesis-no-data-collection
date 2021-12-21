@@ -1,8 +1,7 @@
 URI     ||       LOGIN_CHECK_URI     ||       ANSWER      ||        SUB_DOMAINS       ||        DOMAIN       ||
 test.benelli.dev || https://test.benelli.dev/login/image || 302  ||  con.benelli.dev|ex.benelli.dev  || benelli.dev || 
-www.blick.ch ||  || 302  || api.blick.ch|img.blick.ch|php.blick.ch|auth.ws.blick.ch|weather.ws.blick.ch|chapters.ws.blick.ch|sport.ws.blick.ch ||  || 
 www.tagesanzeiger.ch ||  ||  ||  || tagesanzeiger.ch || 
 www.nzz.ch || https://abo.nzz.ch/benutzerkonto/ || 302  ||  || nzz.ch || 
-www.republik.ch ||  ||  ||  || republik.ch || 
-www.watson.ch ||  ||  ||  || watson.ch || 
+zattoo.com ||  ||  ||  ||  || 
+www.blick.ch ||  || 302  || api.blick.ch|img.blick.ch|php.blick.ch|auth.ws.blick.ch|weather.ws.blick.ch|chapters.ws.blick.ch|sport.ws.blick.ch ||  || 
 www.youtube.com ||  ||  ||  || youtube.com || 

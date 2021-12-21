@@ -109,6 +109,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
+name = "async-std"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8056f1455169ab86dd47b47391e4ab0cbd25410a70e9fe675544f49bafaf952"
+dependencies = [
+ "futures-core 0.3.17",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "autocfg"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -488,6 +498,7 @@ name = "enclave-runtime"
 version = "0.8.0"
 dependencies = [
  "arrayvec 0.7.2",
+ "async-std",
  "base64 0.13.0 (git+https://github.com/mesalock-linux/rust-base64-sgx?rev=sgx_1.1.3)",
  "bit-vec",
  "byteorder 1.4.3",
@@ -496,6 +507,7 @@ dependencies = [
  "cookie",
  "derive_more",
  "env_logger",
+ "executor",
  "frame-support",
  "hex",
  "http_req",
@@ -586,6 +598,17 @@ name = "environmental"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68b91989ae21441195d7d9b9993a2f9295c7e1a8c96255d8b729accddc124797"
+
+[[package]]
+name = "executor"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57967339a930030f7b36f46d7f37bae8b3f5a1c35d47883dc95c192292aab52b"
+dependencies = [
+ "lazy_static",
+ "spin",
+ "woke",
+]
 
 [[package]]
 name = "fake-simd"
@@ -4064,6 +4087,12 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
+
+[[package]]
+name = "woke"
+version = "0.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eafdab77c9ee549298ca6585107832aa89d77b14ba13cda220fec6105b17dbb1"
 
 [[package]]
 name = "wyz"

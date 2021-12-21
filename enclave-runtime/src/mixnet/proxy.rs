@@ -25,6 +25,7 @@ use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
 use cookie::Cookie;
+use std::time::Duration;
 
 #[derive(Clone,Debug)]
 pub struct Domain <'a> {
@@ -137,7 +138,8 @@ lazy_static! {
     ]};
 
     static ref DEFAULT_HEADERS: Vec<(String,String)> = {vec![
-        (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"))
+        (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
+        (String::from("DNT"), String::from("1"))
     ]};
 }
 
@@ -287,8 +289,14 @@ HTTP Requests
 pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(String, String)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+    //create timeout time
+    const READ_TO: Option<Duration> = Some(Duration::from_secs(5));
+    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(5));
+
     //Connect to remote host
     let stream = TcpStream::connect(conn_addr).unwrap();
+    stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
+    stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
     //Open secure connection over TlsStream, because of `addr` (https)
     let mut stream = tls::Config::default()
         .connect(addr.host().unwrap_or(""), stream)
@@ -304,14 +312,28 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         request.header(&header.0, &header.1);
     };
     //println!("{:?}", request);
+    
 
     request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
     //println!("{:?}", addr.path());
-    let response = request.send(&mut stream, &mut writer)
-        .unwrap();
-    //println!("Returned from here");
-    Ok((response, writer)) // return response & body
+    let temp = request.send(&mut stream, &mut writer);
+    match temp {
+        Ok(response) => {
+            Ok((response, writer)) // return response & body
+        },
+        Err(e) => {
+            println!("Couldn't handle request: {:?}", e);
+            const HEAD: &[u8; 102] = b"HTTP/1.1 200 OK\r\n\
+                         Date: Sat, 11 Jan 2003 02:44:04 GMT\r\n\
+                         Content-Type: text/html\r\n\
+                         Content-Length: 100\r\n\r\n";
+
+            let response = Response::from_head(HEAD).unwrap();
+            Ok((response, writer))
+        }
+    }
+
 }
 
 /*

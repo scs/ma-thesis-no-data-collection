@@ -36,6 +36,8 @@ pub struct RouterRequest<'a> {
 pub fn load_all_routes() -> Router<String> {
     let mut router = Router::new();
     router.add("/", "index".to_string());
+    router.add("/favicon.ico", "favicon".to_string());
+    router.add("/favicon/:name", "favicon_special".to_string());
     router
 }
 
@@ -46,8 +48,11 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
         None => {
             match router.recognize(path) {
                 Ok(route_match) => {       
+                    //println!("route_match: {:?}", route_match.params().find("name"));
                     match route_match.handler().as_str() {
                         "index" => index(),
+                        "favicon" => get_favicon("favicon.ico"),
+                        "favicon_special" => get_favicon(route_match.params().find("name").unwrap()),
                         //"proxy" => proxy(req, true),
                         //"proxy_wo_route" => proxy(req, false),
                         _ => not_found(),
@@ -153,4 +158,11 @@ pub fn prepare_response(status_line: &str, headers: Headers, mut contents: Vec<u
     let mut response = response_string.as_bytes().to_vec();
     response.append(&mut contents);
     Ok(response)
+}
+
+pub fn get_favicon(filename: &str)->IOResult<Vec<u8>>{
+    let fav_base_dir = "ma-thesis/favicon/";
+    let path = format!("{}/{}", fav_base_dir, filename);
+    let contents = io::read(&path).unwrap();
+    prepare_response(STATUS_LINE_OK, Headers::new(), contents)
 }

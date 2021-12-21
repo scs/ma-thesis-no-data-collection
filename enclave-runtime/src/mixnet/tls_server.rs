@@ -61,7 +61,7 @@ use urlencoding::decode;
 
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
-
+//use async_std::task;
 //Router
 //static mut ROUTER: router::Router<()> = router::load_all_routes();
 
@@ -265,7 +265,6 @@ impl Connection {
     fn try_plain_read(&mut self) {
         // Read and process all available plaintext.
         let mut buf = Vec::new();
-        
         let rc = self.tls_session.read_to_end(&mut buf);
         if rc.is_err() {
             error!("plaintext read failed: {:?}", rc);
@@ -598,7 +597,6 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
     'outer: loop {
         poll.poll(&mut events, None)
             .unwrap();
-
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
@@ -610,9 +608,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
                     }
                 }
                 _ => {
-                    
                     tlsserv.conn_event(&mut poll, &event);
-                    
                 }
             }
         }

@@ -59,6 +59,11 @@ use std::{
 use urlencoding::decode;
 //use httparse::*;
 
+lazy_static!{
+    static ref PROXY_TARGET_REGEX: Regex = Regex::new("proxy-target=([^;]*)").unwrap();
+    static ref PROXY_UUID_REGEX: Regex = Regex::new("proxy-uuid=([^;]*)").unwrap();
+}
+
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
 //use async_std::task;
@@ -377,16 +382,14 @@ impl Connection {
                         parsed_req.headers.insert(h.name.to_string(), value);
                     }
                     
-                    if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
+                    if parsed_req.headers.contains_key("Cookie"){ // Getting Target adn UUID from Cookie
                         let cookie = parsed_req.headers.get("Cookie").unwrap();
-                        let cookie_target = Regex::new("proxy-target=([^;]*)").unwrap();
-                        let target = match cookie_target.captures(cookie.as_str()) {
+                        let target = match PROXY_TARGET_REGEX.captures(cookie.as_str()) {
                             Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
                             _ => None,
                         };
                         parsed_req.target = target;
-                        let cookie_uuid = Regex::new("proxy-uuid=([^;]*)").unwrap();
-                        let uuid = match cookie_uuid.captures(cookie.as_str()) {
+                        let uuid = match PROXY_UUID_REGEX.captures(cookie.as_str()) {
                             Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
                             _ => None,
                         };
@@ -398,7 +401,11 @@ impl Connection {
                         self.create_request_body(&buf, status.unwrap(), &mut parsed_req.body);
                     }
                     //set auth_req
-                    parsed_req.auth_req = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
+                    parsed_req.auth_req = if parsed_req.body.contains_key("proxy_login"){
+                        parsed_req.method = Some("GET"); // cleanup
+                        parsed_req.body.remove("proxy_login");
+                        true
+                    } else {false};
                 
                     Ok(parsed_req)
                 } else {

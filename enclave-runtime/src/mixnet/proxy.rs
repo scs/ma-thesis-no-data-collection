@@ -382,8 +382,10 @@ pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
     let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Close")), (String::from("Cookie"), cookie.to_string())]).unwrap();
     let status_code = response.status_code();
     match target_domain.login_check_answer.as_str() {
-        "302" if status_code.is_redirect() => {
-            false
+        "302" => {
+            if status_code.is_redirect() {
+                false
+            } else {true}
         },
         _ => true
     }

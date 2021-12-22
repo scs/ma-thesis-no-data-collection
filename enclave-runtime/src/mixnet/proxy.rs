@@ -26,6 +26,7 @@ use sgx_rand as rand;
 use rand::{Rng};
 use cookie::Cookie;
 use std::time::Duration;
+//use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone,Debug)]
 pub struct Domain <'a> {
@@ -40,8 +41,9 @@ pub struct Domain <'a> {
     pub auth_user: HashMap<String,String>
  
 }
- 
 
+// Debug counter
+//static _COUNTER: AtomicU8 = AtomicU8::new(0);
 /*
 ------------------------
 Helper Funcs and Var
@@ -57,9 +59,9 @@ lazy_static! {
             let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
-            let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/)?{}", line.0).as_str()).unwrap();
-            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?({}))", line.3).as_str()).unwrap())};
-            let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
+            let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/|//)?{}", line.0).as_str()).unwrap();
+            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?({}))", line.3).as_str()).unwrap())};
+            let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -74,8 +76,12 @@ lazy_static! {
         };
         Mutex::new(m)
     };
+    
+
     static ref HEAD_REGEX: Regex = Regex::new("(?i)<head?[^>]>").unwrap();
     
+    static ref PROTOCOL_RELATVE_REGEX: Regex  =Regex::new("\\?proxy_sub=//").unwrap();
+
     static ref REPLACE_HEAD_WITH: String = {
         let head_base = "<head> \n <base href=\"";
         let base_char = "/\"/>  \n <meta charset=\"utf-8\">";
@@ -86,6 +92,7 @@ lazy_static! {
             btn.className += \"proxy_target_logout\";
             btn.innerHTML = \"Cancel this session\";
             btn.addEventListener(\"click\", function () {
+                navigator.serviceWorker.getRegistrations().then( function(registrations) { for(let registration of registrations) { registration.unregister(); } }); 
                 document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
                 window.location.href = '/';
             });
@@ -231,7 +238,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     headers.insert("Content-Type", content_type);
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
-        if content_type.contains("text") || content_type.contains("application") {
+        if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
@@ -289,6 +296,7 @@ HTTP Requests
 
 pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(String, String)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
+    //println!("addr: {:?}", addr);
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     //create timeout time
     const READ_TO: Option<Duration> = Some(Duration::from_secs(5));
@@ -405,6 +413,13 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
     let target_domain = get_target_domain(req);
     let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
     let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
+    
+    /* Debug to file
+    let cnt = COUNTER.fetch_add(1, Ordering::SeqCst); 
+    let path = format!("debug/{}_before.txt", cnt);
+    let mut file = File::create(path)?;
+    file.write_all(extended_modified_content.as_bytes())?;
+    */  
     let sub_domain_cleand = if let Some(sub_regex) = target_domain.regex_subdomains {
         regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
     } else {
@@ -415,8 +430,15 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
         } else {extended_modified_content}
         */
     };
-    
-    Ok(sub_domain_cleand)
+
+    let fixed_protocol_relative = regex_replace_all_wrapper(&PROTOCOL_RELATVE_REGEX, &sub_domain_cleand, &"?proxy_sub=https://".to_string());
+    /* Debug to file
+    let path2 = format!("debug/{}_after.txt", cnt);
+    let mut file = File::create(&path2)?;
+    file.write_all(fin.as_bytes())?;
+    println!("done: {}", path2);
+    */
+    Ok(fixed_protocol_relative)
 }
 
 pub fn regex_replace_all_wrapper(regex: &Regex, text: &String, replace_with: &String)-> String {

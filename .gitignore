@@ -62,3 +62,4 @@ bin/light_client_db.bin.1
 
 # ma thesis
 bin/localhost.*
+bin/debug/

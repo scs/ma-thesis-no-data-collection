@@ -77,22 +77,16 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
         },
         Some(_target) => {
             let auth_for_target = proxy::check_auth_for_request(&parsed_req);
-            println!("Auth: {}", auth_for_target);
-            if parsed_req.auth_req { // request from main page
-                
-                // new cookie is coming in
-                if parsed_req.body.contains_key("cookie"){
-                    let cookie = parsed_req.body.remove("cookie").unwrap(); // clean up and thest it
-                    println!("Validating Cookie");
-                    if proxy::cookie_is_valid(&parsed_req, cookie.to_string()) {
-                        proxy(parsed_req)
-                    } else { not_authorized() }
+            //println!("Auth: {}", auth_for_target);
+            if parsed_req.inital_auth_req { // request from main page containing a cookie!
+                // new cookie is coming in, get it
+                let cookie = parsed_req.body.remove("cookie").unwrap();
+                //println!("Validating Cookie");
+                if proxy::cookie_is_valid(&parsed_req, cookie.to_string()) {
+                    proxy(parsed_req)
                 } else if auth_for_target {
                     proxy(parsed_req)
-                } else {
-                    //proxy(parsed_req) // TODO REMOVE THIS AT END!!!
-                    not_authorized()
-                }
+                } else { not_authorized() }
             } else if auth_for_target { // proxy traffic which is authenticated
                 proxy(parsed_req)
             } else { // not authorized traffic

@@ -182,7 +182,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
     let target_uri = parse_target_uri(&req);
     let headers = create_headers_to_forward(&req);
     //let (res, body) = send_https_request(https_url, &req).unwrap();
-    let body = if req.auth_req {
+    let body = if req.inital_auth_req {
         String::new()
     } else {
         hashmap_to_string(&req.body)

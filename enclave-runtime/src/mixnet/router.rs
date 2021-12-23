@@ -90,7 +90,8 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
             } else if auth_for_target { // proxy traffic which is authenticated
                 proxy(parsed_req)
             } else { // not authorized traffic
-                not_authorized()
+                //not_authorized() 
+                proxy(parsed_req) // only for testing reason, the line above should be used
             }
         }
     }

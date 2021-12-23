@@ -26,7 +26,7 @@ use sgx_rand as rand;
 use rand::{Rng};
 use cookie::Cookie;
 use std::time::Duration;
-//use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone,Debug)]
 pub struct Domain <'a> {
@@ -37,13 +37,14 @@ pub struct Domain <'a> {
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
     pub regex_subdomains: Option<Regex>,
+    pub regex_subdomains_relative: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
     pub auth_user: HashMap<String,String>
  
 }
 
 // Debug counter
-//static _COUNTER: AtomicU8 = AtomicU8::new(0);
+static COUNTER: AtomicU8 = AtomicU8::new(0);
 /*
 ------------------------
 Helper Funcs and Var
@@ -60,7 +61,8 @@ lazy_static! {
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/|//)?{}", line.0).as_str()).unwrap();
-            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?({}))", line.3).as_str()).unwrap())};
+            let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/)({}))", line.3).as_str()).unwrap())};
+            let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\')//({})", line.3).as_str()).unwrap())};
             let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
@@ -70,6 +72,7 @@ lazy_static! {
                 regex_uri: base_regex,
                 regex_uri_extended: exended_base_regex,
                 regex_subdomains: subdomains_regex,
+                regex_subdomains_relative: subdomains_regex_relative,
                 regex_general_subdomains: all_subdomains_regex,
                 auth_user: HashMap::new(),
             });
@@ -92,7 +95,9 @@ lazy_static! {
             btn.className += \"proxy_target_logout\";
             btn.innerHTML = \"Cancel this session\";
             btn.addEventListener(\"click\", function () {
+                if (\"serviceWorker\" in navigator) {
                 navigator.serviceWorker.getRegistrations().then( function(registrations) { for(let registration of registrations) { registration.unregister(); } }); 
+                }
                 document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
                 window.location.href = '/';
             });
@@ -141,12 +146,15 @@ lazy_static! {
         //String::from("Accept-Encoding"),
         String::from("Connection"),
         String::from("Access-Control-Allow-Origin"),
+
+
         //String::from("Content-Length") // Will be calculated later
     ]};
 
     static ref DEFAULT_HEADERS: Vec<(String,String)> = {vec![
         (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
-        (String::from("DNT"), String::from("1"))
+        (String::from("DNT"), String::from("1")),
+        (String::from("Cache-Control"), String::from("no-cache"))
     ]};
 }
 
@@ -212,9 +220,19 @@ pub fn parse_target_uri(req: & Request) -> Uri {
     let regex = Regex::new("proxy_sub=(.*)").unwrap();
     let path = req.path.unwrap();
     let https_url = match regex.captures(path) {
-        Some(res) => {res.get(1).unwrap().as_str().to_string()},
+        Some(res) => { 
+            let url = res.get(1).unwrap().as_str().to_string();
+            if url.starts_with("https") {
+                url
+            } else {
+                let mut prep_https = String::from("https://");
+                prep_https+= &url;
+                prep_https
+            }
+        },
         _ => {create_https_url_from_target_and_route(req)}
     };
+    //println!("Targeting: {}", https_url);
     https_url.parse().unwrap()
 }
 
@@ -236,6 +254,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let default_content_type = String::from("text/plain");
     let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
     headers.insert("Content-Type", content_type);
+    headers.insert("Access-Control-Allow-Origin", "*");
+
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
@@ -412,18 +432,35 @@ Mutating Response Part
 ------------------------
 */
 pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> IOResult<String> {
-    let target_domain = get_target_domain(req);
-    let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
-    let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
+    /* Debug to file */
+    let cnt = COUNTER.fetch_add(1, Ordering::SeqCst);
+    /*
+    let path = format!("debug/{}_0.txt", cnt);
+    let mut file_0 = File::create(path)?;
+    let path = format!("debug/{}_1.txt", cnt);
+    let mut file_1 = File::create(path)?; 
+    let path = format!("debug/{}_2.txt", cnt);
+    let mut file_2 = File::create(path)?;
+    let path = format!("debug/{}_3.txt", cnt);
+    let mut file_3 = File::create(path)?;
     
-    /* Debug to file
-    let cnt = COUNTER.fetch_add(1, Ordering::SeqCst); 
-    let path = format!("debug/{}_before.txt", cnt);
-    let mut file = File::create(path)?;
-    file.write_all(extended_modified_content.as_bytes())?;
-    */  
+    let path = format!("debug/{}_4.txt", cnt);
+    let mut file_4 = File::create(path)?;*/
+ 
+    
+    let target_domain = get_target_domain(req);
+    //file_0.write_all(content.as_bytes())?;
+    let modified_content = regex_replace_all_wrapper(&target_domain.regex_uri, &content, &replace_with);
+    //file_1.write_all(modified_content.as_bytes())?;
+    let extended_modified_content = regex_replace_all_wrapper(&target_domain.regex_uri_extended, &modified_content, &HTTPS_BASE_URL.to_string());
+    //file_0.write_all(extended_modified_content.as_bytes())?;
     let sub_domain_cleand = if let Some(sub_regex) = target_domain.regex_subdomains {
-        regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+        let intermediate = regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL ));
+        //let fixed_protocol_relative = regex_replace_all_wrapper(&PROTOCOL_RELATVE_REGEX, &sub_domain_cleand, &"?proxy_sub=https://".to_string());
+        //file_2.write_all(fixed_protocol_relative.as_bytes())?;
+        //Regex::new("(\"|\')//(assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch)").unwrap();
+       regex_replace_all_wrapper(&target_domain.regex_subdomains_relative.unwrap(), &intermediate,  &format!("$1//{}/?proxy_sub=https://$2", BASE_LOCALHOST_URL))
+        //file_3.write_all(fixed_protocol_relative2.as_bytes())?;
     } else {
         extended_modified_content
         /*
@@ -432,15 +469,8 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
         } else {extended_modified_content}
         */
     };
-
-    let fixed_protocol_relative = regex_replace_all_wrapper(&PROTOCOL_RELATVE_REGEX, &sub_domain_cleand, &"?proxy_sub=https://".to_string());
-    /* Debug to file
-    let path2 = format!("debug/{}_after.txt", cnt);
-    let mut file = File::create(&path2)?;
-    file.write_all(fin.as_bytes())?;
-    println!("done: {}", path2);
-    */
-    Ok(fixed_protocol_relative)
+    //file_1.write_all(sub_domain_cleand.as_bytes())?;
+    Ok(sub_domain_cleand)
 }
 
 pub fn regex_replace_all_wrapper(regex: &Regex, text: &String, replace_with: &String)-> String {

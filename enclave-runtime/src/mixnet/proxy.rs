@@ -62,7 +62,7 @@ lazy_static! {
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/|//)?{}", line.0).as_str()).unwrap();
             let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/)({}))", line.3).as_str()).unwrap())};
-            let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\')//({})", line.3).as_str()).unwrap())};
+            let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\'|\\()//|({})", line.3).as_str()).unwrap())};
             let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
@@ -432,9 +432,9 @@ Mutating Response Part
 ------------------------
 */
 pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> IOResult<String> {
-    /* Debug to file */
+    /*/* Debug to file */
     let cnt = COUNTER.fetch_add(1, Ordering::SeqCst);
-    /*
+    
     let path = format!("debug/{}_0.txt", cnt);
     let mut file_0 = File::create(path)?;
     let path = format!("debug/{}_1.txt", cnt);

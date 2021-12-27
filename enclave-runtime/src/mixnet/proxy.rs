@@ -146,9 +146,17 @@ lazy_static! {
         //String::from("Accept-Encoding"),
         String::from("Connection"),
         String::from("Access-Control-Allow-Origin"),
+        String::from("Cookie"), // Will be calculated later
+
+        String::from("content-type")
+        //String::from("Sec-Fetch-Dest"),
+        /*
+        String::from("Sec-Fetch-Dest"),
+        String::from("Sec-Fetch-Mode"),
+        String::from("Sec-Fetch-Site"),
+        */
 
 
-        //String::from("Content-Length") // Will be calculated later
     ]};
 
     static ref DEFAULT_HEADERS: Vec<(String,String)> = {vec![
@@ -175,6 +183,7 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
         }
     };*/
     let cookie = get_random_cookie(&req);
+    //println!("using cookie: {}", cookie);
     if !cookie.eq(&String::from("")){
         forwarded_headers.push((String::from("Cookie"),cookie));
     }
@@ -255,7 +264,9 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
     headers.insert("Content-Type", content_type);
     headers.insert("Access-Control-Allow-Origin", "*");
-
+    //let default_cookies = String::from("");
+    //let cookies = res.headers().get("set-cookie").unwrap_or(&default_cookies);
+    //headers.insert("Set-Cookie", cookies);
     //println!("Response: {:?}", res);
     let body = if status_code.is_success() { // StatusCode 200 - 299
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
@@ -295,9 +306,9 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         //println!("DEBUG INFOS: {:?}", req);
-        //println!("Response: {:?}", String::from_utf8(&body_original));
-        //body_original.to_vec()
-        String::from("400").as_bytes().to_vec()
+        //println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
+        body_original.to_vec()
+        //String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         String::from("500").as_bytes().to_vec()
@@ -457,10 +468,16 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
     let sub_domain_cleand = if let Some(sub_regex) = target_domain.regex_subdomains {
         let intermediate = regex_replace_all_wrapper(&sub_regex, &extended_modified_content, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL ));
         //let fixed_protocol_relative = regex_replace_all_wrapper(&PROTOCOL_RELATVE_REGEX, &sub_domain_cleand, &"?proxy_sub=https://".to_string());
-        //file_2.write_all(fixed_protocol_relative.as_bytes())?;
+        //file_1.write_all(intermediate.as_bytes())?;
         //Regex::new("(\"|\')//(assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch)").unwrap();
-       regex_replace_all_wrapper(&target_domain.regex_subdomains_relative.unwrap(), &intermediate,  &format!("$1//{}/?proxy_sub=https://$2", BASE_LOCALHOST_URL))
+        regex_replace_all_wrapper(&target_domain.regex_subdomains_relative.unwrap(), &intermediate,  &format!("$1//{}/?proxy_sub=https://$2", BASE_LOCALHOST_URL))
         //file_3.write_all(fixed_protocol_relative2.as_bytes())?;
+           /* 
+        let domains = "assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch";
+
+        let re2 = Regex::new(format!(r"(\\u002F\\u002F)({})", domains).as_str()).unwrap();
+        regex_replace_all_wrapper(&re2, &int,   &format!(r"\u002F\u002F{}\u002F\u003Fproxy_sub=https:$0", BASE_LOCALHOST_URL))
+        */
     } else {
         extended_modified_content
         /*

@@ -29,11 +29,13 @@ use std::time::Duration;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone,Debug)]
-pub struct Domain <'a> {
+pub struct Domain {
+//    pub struct Domain <'a> {
     pub uri: Uri, 
     pub login_check_uri: Uri,
     pub login_check_answer: String,
-    pub cookies: Vec<Cookie<'a>>,
+    //pub cookies: Vec<Cookie<'a>>,
+    pub cookies: Vec<String>,
     pub regex_uri: Regex,
     pub regex_uri_extended: Regex, 
     pub regex_subdomains: Option<Regex>,
@@ -51,7 +53,8 @@ Helper Funcs and Var
 ------------------------
 */
 lazy_static! {
-    static ref PROXY_URLS: Mutex<HashMap<String, Domain<'static>>> = {
+    static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
+//        static ref PROXY_URLS: Mutex<HashMap<String, Domain<'static>>> = {
         let mut m = HashMap::new();
         let services = lines_from_file("ma-thesis/services.txt", 1);
         for service in services {
@@ -108,7 +111,8 @@ lazy_static! {
     };
 }
 
-pub fn get_target_domain<'a>(req: &'a  Request)-> Domain<'a> {
+pub fn get_target_domain<'a>(req: &'a  Request)-> Domain {
+    //pub fn get_target_domain<'a>(req: &'a  Request)-> Domain<'a> {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     target_domain.clone()
@@ -146,7 +150,7 @@ lazy_static! {
         //String::from("Accept-Encoding"),
         String::from("Connection"),
         String::from("Access-Control-Allow-Origin"),
-        String::from("Cookie"), // Will be calculated later
+        //String::from("Cookie"), // Will be calculated later
 
         String::from("content-type")
         //String::from("Sec-Fetch-Dest"),
@@ -162,7 +166,8 @@ lazy_static! {
     static ref DEFAULT_HEADERS: Vec<(String,String)> = {vec![
         (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
         (String::from("DNT"), String::from("1")),
-        (String::from("Cache-Control"), String::from("no-cache"))
+        (String::from("Cache-Control"), String::from("no-cache")),
+        //(String::from("Cookie"), String::from("pzuid=e8d084518706744c0d45d166e020266d5e5ec489f8429ad4bb454844c86c3b7561c8999c; beaker.session.id=525f092dfd55682e2f90a6faaf4fe47d8d881713gAJ9cQEoVQdfZG9tYWlucQJOVQ5fY3JlYXRpb25fdGltZXEDR0HYcidZTrS3VQNfaWRxBFVAODU2NTRhY2RmZDRiMGIzODk1Mzk4NTI3ZWNiYzZmMmUyZWU5ZTA5NTJkMjI5ZjkyZTMxY2I2YzBkNjA0OWU0ZHEFVQ5fYWNjZXNzZWRfdGltZXEGR0HYcl00hXVYWA8AAABzZXNzaW9uX3ZlcnNpb25xB0sCVQVfcGF0aHEIVQEvdS4="))
     ]};
 }
 
@@ -429,8 +434,11 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     //target_domain.cookies.push(String::from("hello"));
     //println!("{} will be inserted to {:?}", cookie, target_domain);  
     let cookie_decoded = cookie.clone().replace("+", " ");
+    /*
     let parsed_cookie = Cookie::parse(cookie_decoded).unwrap();
     target_domain.auth_user.insert(req.uuid.as_ref().unwrap().to_string(), parsed_cookie.value().to_string());
+    */
+    let parsed_cookie = cookie_decoded;
     target_domain.cookies.push(parsed_cookie);
 
     //println!("Vector now {:?}",  target_domain);

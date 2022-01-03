@@ -81,7 +81,9 @@
 
                 /* ----- NZZ ----- */
           case action.includes('nzz'):
-            cookies = "todo";
+            srch = "cresid_nzz";
+            cookie = cookie_str.find(o => o.name === srch);
+            cookies = srch+"="+cookie.value+";";
             break;
 
                 /* ----- Target Service ----- */

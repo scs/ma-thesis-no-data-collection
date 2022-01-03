@@ -1,140 +1,190 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title> Proxy Login Page!</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
-    <link rel="manifest" href="/favicon/site.webmanifest">
-    <!--Disable Cache Control-->
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <script src="https://unpkg.com/uuid@latest/dist/umd/uuidv4.min.js"></script>
-    <script type="text/javascript">
-      function setProxyTarget() {
-       //select option value from select tag and storing it in a variable.
+<head>
+  <meta charset="utf-8">
+  <title> Proxy Login Page!</title>
+  <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
+  <link rel="manifest" href="/favicon/site.webmanifest">
+  <!--Disable Cache Control-->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <script src="https://unpkg.com/uuid@latest/dist/umd/uuidv4.min.js"></script>
+  <script type="text/javascript">
+    function setProxyTarget() {
+      //select option value from select tag and storing it in a variable.
       var x = document.getElementById("form_action").selectedIndex;
       var action = document.getElementsByTagName("option")[x].value;
-        if (action !== "") {
-          //document.getElementById("form_id").action = "proxy/"+action;
-          updateUUID();
-          setCookie("proxy-target", action, 1);
-          document.getElementById("form_id").submit();
-        } else {
+      if (action !== "") {
+        //document.getElementById("form_id").action = "proxy/"+action;
+        updateUUID();
+        setCookie("proxy-target", action, 1);
+        document.getElementById("form_id").submit();
+      } else {
         alert("Please set form action");
-        }
-        
-      }
-      function setCookie(cname, cvalue, exhours) {
-        const d = new Date();
-        d.setTime(d.getTime() + (exhours*60*60*1000));
-        let expires = "expires="+ d.toUTCString();
-        document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
-      }
-      
-      function updateUUID(){
-        var cname = "proxy-uuid";
-        var cookie = getCookie(cname);
-        if (cookie === null){
-          //alert("cookie not found");
-          cookie = uuidv4();
-        }
-        setCookie(cname, cookie, 1); //  @TODO: Reset this value
       }
 
-      function getCookie(name) {
-        var dc = document.cookie;
-        var prefix = name + "=";
-        var begin = dc.indexOf("; " + prefix);
-        if (begin === -1) {
-            begin = dc.indexOf(prefix);
-            if (begin !== 0) return null;
+    }
+    function setCookie(cname, cvalue, exhours) {
+      const d = new Date();
+      d.setTime(d.getTime() + (exhours*60*60*1000));
+      let expires = "expires="+ d.toUTCString();
+      document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+    }
+
+    function updateUUID(){
+      var cname = "proxy-uuid";
+      var cookie = getCookie(cname);
+      if (cookie === null){
+        //alert("cookie not found");
+        cookie = uuidv4();
+      }
+      setCookie(cname, cookie, 1); //  @TODO: Reset this value
+    }
+
+    function getCookie(name) {
+      var dc = document.cookie;
+      var prefix = name + "=";
+      var begin = dc.indexOf("; " + prefix);
+      if (begin === -1) {
+        begin = dc.indexOf(prefix);
+        if (begin !== 0) return null;
+      }
+      else{
+        begin += 2;
+        var end = document.cookie.indexOf(";", begin);
+        if (end === -1) {
+          end = dc.length;
         }
-        else{
-            begin += 2;
-            var end = document.cookie.indexOf(";", begin);
-            if (end === -1) {
-            end = dc.length;
-            }
+      }
+      return decodeURI(dc.substring(begin + prefix.length, end));
+    }
+    function cleanCookie() {
+      var x = document.getElementById("form_action").selectedIndex;
+      let cookie_value = document.getElementById("cookie").value;
+      var action = document.getElementsByTagName("option")[x].value;
+      if (action !== "" && cookie_value !== "") {
+        let cookie_str = JSON.parse(cookie_value);
+        //document.getElementById("form_id").action = "proxy/"+action;
+        let cookies = "";
+        let srch = "";
+        let cookie = "";
+        switch(true){
+                /* ----- Tagesanzeiger ----- */
+          case action.includes('tagesanzeiger'):
+            srch = "refreshToken";
+            cookie = cookie_str.find(o => o.name === srch);
+            cookies = srch+"="+cookie.value+";";
+            break;
+
+                /* ----- NZZ ----- */
+          case action.includes('nzz'):
+            cookies = "todo";
+            break;
+
+                /* ----- Target Service ----- */
+          case action.includes('test.benelli.dev'):
+            srch = "target_service_session";
+            cookie = cookie_str.find(o => o.name === srch);
+            cookies = srch+"="+cookie.value+";";
+            break;
+
+                /* ----- Zattoo ----- */
+          case action.includes('zattoo'):
+            let srch1 = "pzuid";
+            let cookie1 = cookie_str.find(o => o.name === srch1);
+            let srch2 = "beaker.session.id";
+            let cookie2 = cookie_str.find(o => o.name === srch2);
+            cookies = srch1+"="+cookie1.value+";"+srch2+"="+cookie2.value+";";
+            //cookies = "pzuid="+cookie1.value+";beaker.session.id="+cookie2.value+";";
+            break;
         }
-        return decodeURI(dc.substring(begin + prefix.length, end));
-    } 
+        document.getElementById("cookie").value = cookies;
+        //alert(cookies)
+
+      } else if (cookie_value !== "") {
+        alert("Select for which target cookies should be cleaned");
+      }
+    }
 
 
-    </script>
-  </head>
-  <style>
-    .center {
-      margin: 0 auto;
-      width: 300px;
-    }
-    form {
-      margin:0 auto;
-      width:300px
-    }    
-    select {
-      margin-bottom:3px;
-      padding:10px;
-      width: 100%;
-      width: 322px;
-      border:1px solid #CCC
-    }
-    input {
-      margin-bottom:3px;
-      padding:10px;
-      width: 100%;
-      border:1px solid #CCC;
-      max-width: 100%;
-    }
-    button {
-      padding:10px
-    }
-    label {
-      cursor:pointer
-    }
-    .align-margin{
-      display: block;
-      margin-left: auto;
-      margin-right: auto;
-    }
+  </script>
+</head>
+<style>
+  .center {
+    margin: 0 auto;
+    width: 300px;
+  }
+  form {
+    margin:0 auto;
+    width:300px
+  }
+  select {
+    margin-bottom:3px;
+    padding:10px;
+    width: 100%;
+    width: 322px;
+    border:1px solid #CCC
+  }
+  input {
+    margin-bottom:3px;
+    padding:10px;
+    width: 100%;
+    border:1px solid #CCC;
+    max-width: 100%;
+  }
+  button {
+    padding:10px
+  }
+  label {
+    cursor:pointer
+  }
+  .align-margin{
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
 
-  </style>
-  <body>
-    <div class="center">
-      <h1>Hello!</h1>
-      <p>Provide your Credentials and select service</p>
+</style>
+<body>
+<div class="center">
+  <h1>Hello!</h1>
+  <p>Provide your Credentials and select service</p>
+</div>
+<div class="center">
+  <select id="form_action">
+    <option value="">--- Wähle Service ---</option>
+    <option value="test.benelli.dev">test-service</option>
+    <option value="www.tagesanzeiger.ch">tagesanzeiger.ch</option>
+    <option value="www.nzz.ch">nzz.ch</option>
+    <option value="zattoo.com">zattoo</option>
+    <option value="www.blick.ch">blick.ch</option>
+    <option value="www.youtube.com">youtube.com</option>
+  </select>
+</div>
+<div class="center">
+  <form id='form_id' action="/" method='post'>
+    <!--input name="username" id="username" type="text" placeholder="Username" required value="bla">
+    <input name="password" id="password" type="password" placeholder="Password" required value="bla">
+    <p class="align-margin" style="margin-top: 5px; margin-bottom: 8px; width: 20px; padding-left: 18px;">or</p-->
+    <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
+    <input name="proxy_login" id="proxy_login" type="hidden" required readonly value="true">
+    <div style="width: 322px;">
+      <input type='button' value='Clean Cookie String' onclick="cleanCookie()"/>
     </div>
-    <div class="center">
-      <select id="form_action">
-        <option value="">--- Wähle Service ---</option>
-        <option value="test.benelli.dev">test-service</option>
-        <option value="www.tagesanzeiger.ch">tagesanzeiger.ch</option>
-        <option value="www.nzz.ch">nzz.ch</option>
-        <option value="zattoo.com">zattoo</option>
-        <option value="www.blick.ch">blick.ch</option>
-        <option value="www.youtube.com">youtube.com</option>
-      </select>
+    <div style="width: 322px;">
+      <input type='button' value='Login' onclick="setProxyTarget()"/>
     </div>
-    <div class="center">
-      <form id='form_id' action="/" method='post'>
-        <!--input name="username" id="username" type="text" placeholder="Username" required value="bla">
-        <input name="password" id="password" type="password" placeholder="Password" required value="bla">
-        <p class="align-margin" style="margin-top: 5px; margin-bottom: 8px; width: 20px; padding-left: 18px;">or</p-->
-        <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
-        <input name="proxy_login" id="proxy_login" type="hidden" required readonly value="true">
-        <div style="width: 322px;">
-          <input type='button' value='Login' onclick="setProxyTarget()"/>
-        </div>
-      </form>
-      <p>Use this cookie:</p>
-      <ul>
-        <li>target-service: target-session</li>
-        <li>tagesanzeiger: refreshToken (Achtung: Reload Link necessary!)</li>
-        <li>nzz.ch: todo</li>
-        <li>zattoo.com: pzuid und breaker.session</li>
-      </ul>
-    </div>
-  </body>
+  </form>
+  <p>Either export Cookies from Cookie-Editor-Addon or create your raw cookies</p>
+  <ul>
+    <li>target-service: target-session</li>
+    <li>tagesanzeiger: refreshToken (Achtung: Reload Link necessary!)</li>
+    <li>nzz.ch: todo</li>
+    <li>zattoo.com: pzuid und breaker.session</li>
+  </ul>
+</div>
+</body>
 </html>

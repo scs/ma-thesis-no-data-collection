@@ -1,7 +1,8 @@
 URI     ||       LOGIN_CHECK_URI     ||       ANSWER      ||        SUB_DOMAINS       ||        DOMAIN       ||
 test.benelli.dev || https://test.benelli.dev/login/image || 302 ||  con.benelli.dev|ex.benelli.dev  || benelli.dev || 
 www.tagesanzeiger.ch ||  ||  ||  || tagesanzeiger.ch || 
-www.nzz.ch || https://abo.nzz.ch/benutzerkonto/ || 303 || assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch|tic-nzz.ch ||  || 
+www.nzz.ch || https://abo.nzz.ch/benutzerkonto/ || 302 || assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch|tic-nzz.ch ||  || 
 zattoo.com ||  ||  || images.zattic.com ||  || 
 www.blick.ch ||  || 302 || api.blick.ch|img.blick.ch|php.blick.ch|auth.ws.blick.ch|weather.ws.blick.ch|chapters.ws.blick.ch|sport.ws.blick.ch ||  || 
 www.youtube.com ||  ||  ||  || youtube.com || 
+coveryourtracks.eff.org ||  ||  ||  ||  || 

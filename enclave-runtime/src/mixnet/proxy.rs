@@ -310,7 +310,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
-        //println!("DEBUG INFOS: {:?}", req);
+        println!("DEBUG INFOS MEthod: {:?}", req.method);
         //println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
         body_original.to_vec()
         //String::from("400").as_bytes().to_vec()
@@ -423,7 +423,23 @@ pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
                 false
             } else {true}
         },
-        _ => true
+        "tagi" => {
+            let body = String::from_utf8_lossy(&_body);
+            println!("Cookie used: {}", cookie);
+            if body.contains("abo-button") {
+                println!("Login successfull");
+            } else {
+                println!("not good");
+            }
+            true
+        },
+        "403" => {
+            if status_code.is_client_err() {
+                false
+            } else {true}
+        },
+        _ => {
+            true}
     }
 }
 

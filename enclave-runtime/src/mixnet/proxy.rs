@@ -494,11 +494,17 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
         //let fixed_protocol_relative = regex_replace_all_wrapper(&PROTOCOL_RELATVE_REGEX, &sub_domain_cleand, &"?proxy_sub=https://".to_string());
         //file_1.write_all(intermediate.as_bytes())?;
         //Regex::new("(\"|\')//(assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch)").unwrap();
-        regex_replace_all_wrapper(&target_domain.regex_subdomains_relative.unwrap(), &intermediate,  &format!("$1//{}/?proxy_sub=https://$2", BASE_LOCALHOST_URL))
+        let sb_relative = regex_replace_all_wrapper(&target_domain.regex_subdomains_relative.unwrap(), &intermediate,  &format!("$1//{}/?proxy_sub=https://$2", BASE_LOCALHOST_URL));
         //file_3.write_all(fixed_protocol_relative2.as_bytes())?;
+        sb_relative
            /* 
         let domains = "assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch";
-
+        try out zatoo */
+        /*
+        if let Some(general_sub) = target_domain.regex_general_subdomains {
+            regex_replace_all_wrapper(&general_sub, &sb_relative, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+        } else {sb_relative}*/
+        /*
         let re2 = Regex::new(format!(r"(\\u002F\\u002F)({})", domains).as_str()).unwrap();
         regex_replace_all_wrapper(&re2, &int,   &format!(r"\u002F\u002F{}\u002F\u003Fproxy_sub=https:$0", BASE_LOCALHOST_URL))
         */

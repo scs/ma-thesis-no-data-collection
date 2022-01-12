@@ -43,6 +43,7 @@ pub fn load_all_routes() -> Router<String> {
 
 pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8>>{
     //println!("path: {:?}", path);
+    
     let router = load_all_routes();
     match &parsed_req.target {
         None => {
@@ -70,8 +71,14 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         not_found()
                     } else {*/
                         println!("Error, No Cookie was set and : {}", e);
-                        //println!("Debug: sw js {:?}", parsed_req);
-                        not_found()
+                        if parsed_req.path.unwrap().contains("zahs.tv") {
+                            parsed_req.target = Some(String::from("zattoo.com"));
+                            proxy(parsed_req)
+                        } else {
+                            println!("Debug: sw js {:?}", parsed_req);
+                            not_found()
+                        }
+
                 }
             }
         },

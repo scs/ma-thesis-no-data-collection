@@ -25,7 +25,9 @@ use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
 use cookie::Cookie;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use time::OffsetDateTime;
+use chrono::prelude::*;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 #[derive(Clone,Debug)]
@@ -233,7 +235,15 @@ pub fn check_auth_for_request(req: & Request) -> bool {
 pub fn parse_target_uri(req: & Request) -> Uri {
     let regex = Regex::new("proxy_sub=(.*)").unwrap();
     let path = req.path.unwrap();
-    let https_url = match regex.captures(path) {
+    //println!("Targeting: {}", path);
+    let https_url = if path.contains("track_audio") | path.contains("track_video") {
+        let backup = format!("{}/", HTTPS_BASE_URL);
+        let cdn = req.zattoo_cdn.as_ref().unwrap_or(&backup);
+        let cdn_build = &cdn[0..cdn.len()-1];
+        let test = format!("{}{}", cdn_build,path );
+        test
+    } else {
+        match regex.captures(path) {
         Some(res) => { 
             let url = res.get(1).unwrap().as_str().to_string();
             if url.starts_with("https") {
@@ -245,8 +255,8 @@ pub fn parse_target_uri(req: & Request) -> Uri {
             }
         },
         _ => {create_https_url_from_target_and_route(req)}
-    };
-    //println!("Targeting: {}", https_url);
+    }};
+
     https_url.parse().unwrap()
 }
 
@@ -273,7 +283,25 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     //let cookies = res.headers().get("set-cookie").unwrap_or(&default_cookies);
     //headers.insert("Set-Cookie", cookies);
     //println!("Response: {:?}", res);
+
+    //Zattoo extra logic
+    let regex = Regex::new("set-proxy-zattoo=([^&]*)").unwrap();
+    let path = req.path.unwrap();
+    match regex.captures(path) {
+        Some(res) => {
+            let url = res.get(1).unwrap().as_str();
+            //let datetime= Instant::now() + Duration::from_secs(7200);
+            let dt = OffsetDateTime::now_utc()+Duration::from_secs(7200);
+            //println!("{:?}", datetime.toUTCString());
+            let val = format!("proxy-zattoo-cdn={}; Expires={}; Max-Age=3600; Path=/; SameSite=None; Secure", url, dt);
+            headers.insert("Set-cookie", &val);
+            //println!("Inserted: {}", val);
+        },
+        _ => {}
+    }
+
     let body = if status_code.is_success() { // StatusCode 200 - 299
+        try_zatto_res(&res, & mut headers);
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
@@ -311,7 +339,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
         println!("DEBUG INFOS MEthod: {:?}", req.method);
-        //println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
+        println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
         body_original.to_vec()
         //String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
@@ -322,6 +350,22 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     Ok((status_line, headers, body))
     //prepare_response(status_line, headers, body)
     //Ok(body)
+}
+
+pub fn try_zatto_res(res: & Response, headers: & mut Headers){
+    try_to_insert_to_header(&String::from("Date"), res, headers);
+    try_to_insert_to_header(&String::from("Server"), res, headers);
+    try_to_insert_to_header(&String::from("Cache-Control"), res, headers);
+    try_to_insert_to_header(&String::from("Connection"), res, headers);
+}
+
+pub fn try_to_insert_to_header(key: &String, res: & Response, headers: & mut Headers){
+    //let def = String::new();
+    match res.headers().get(key) {
+        Some(val) => {headers.insert(key, val);},
+        _ => {}
+    }
+    
 }
 
 /*
@@ -346,7 +390,7 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     let mut stream = tls::Config::default()
         .connect(addr.host().unwrap_or(""), stream)
         .unwrap();
-    //Container for response's body
+    //Container for re§ponse's body
     let mut writer = Vec::new();
     let mut request = RequestBuilder::new(&addr)
         .method(method).to_owned();
@@ -503,7 +547,7 @@ pub fn clean_urls(content: & String, req: & Request, replace_with: &String) -> I
         /*
         if let Some(general_sub) = target_domain.regex_general_subdomains {
             regex_replace_all_wrapper(&general_sub, &sb_relative, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
-        } else {sb_relative}*/
+        } else {sb_relative} */
         /*
         let re2 = Regex::new(format!(r"(\\u002F\\u002F)({})", domains).as_str()).unwrap();
         regex_replace_all_wrapper(&re2, &int,   &format!(r"\u002F\u002F{}\u002F\u003Fproxy_sub=https:$0", BASE_LOCALHOST_URL))

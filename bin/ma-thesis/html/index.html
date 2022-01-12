@@ -31,7 +31,7 @@
       const d = new Date();
       d.setTime(d.getTime() + (exhours*60*60*1000));
       let expires = "expires="+ d.toUTCString();
-      document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;secure=true;SameSite=None;";
+      document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;SameSite=None;Secure";
     }
 
     function updateUUID(){
@@ -172,7 +172,7 @@
     <!--input name="username" id="username" type="text" placeholder="Username" required value="bla">
     <input name="password" id="password" type="password" placeholder="Password" required value="bla">
     <p class="align-margin" style="margin-top: 5px; margin-bottom: 8px; width: 20px; padding-left: 18px;">or</p-->
-    <input name="cookie" id="cookie" type="text" placeholder="Cookie" required>
+    <input name="cookie" id="cookie" type="text" placeholder="Cookie" required value="pzuid=891c40cc6653cd44300ea2dab863eec92a158b4802ca26eca1d4b7d9a961f29961dc1792;beaker.session.id=365e9a617149e65e941a334136c28d189e4a6fa5gAJ9cQEoVQdfZG9tYWlucQJOVQ5fY3JlYXRpb25fdGltZXEDR0HYdwXfiOIiVQNfaWRxBFVAMGY1NDEwOGNiZTIzNTlkYzFiYTMxOWQ2YjRlNzc5Y2IxZWVhOTVkYTg2OTY0NmJhZjZhMTdkYzg4MDljNTQzM3EFVQ5fYWNjZXNzZWRfdGltZXEGR0HYdwX8vcp5WA8AAABzZXNzaW9uX3ZlcnNpb25xB0sCVQVfcGF0aHEIVQEvdS4=;">
     <input name="proxy_login" id="proxy_login" type="hidden" required readonly value="true">
     <div style="width: 322px;">
       <input type='button' value='Clean Cookie String' onclick="cleanCookie()"/>

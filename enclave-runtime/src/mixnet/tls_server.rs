@@ -39,6 +39,7 @@ pub struct Request<'a> {
     pub headers: HashMap<String, String>,
     pub body: HashMap<String, String>,
     pub target: Option<String>,
+    pub zattoo_cdn: Option<String>,
     pub uuid: Option<String>,
     pub inital_auth_req: bool,
 }
@@ -62,6 +63,7 @@ use urlencoding::decode;
 lazy_static!{
     static ref PROXY_TARGET_REGEX: Regex = Regex::new("proxy-target=([^;]*)").unwrap();
     static ref PROXY_UUID_REGEX: Regex = Regex::new("proxy-uuid=([^;]*)").unwrap();
+    static ref PROXY_ZATTOO_CDN_REGEX: Regex = Regex::new("proxy-zattoo-cdn=([^;]*)").unwrap();
 }
 
 // Token for our listening socket.
@@ -373,6 +375,7 @@ impl Connection {
                         headers: HashMap::<String,String>::new(),
                         body: HashMap::<String,String>::new(),
                         target: None,
+                        zattoo_cdn: None,
                         uuid: None,
                         inital_auth_req: false
                     };
@@ -394,6 +397,11 @@ impl Connection {
                             _ => None,
                         };
                         parsed_req.uuid = uuid;
+                        let zattoo_cdn = match PROXY_ZATTOO_CDN_REGEX.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.zattoo_cdn = zattoo_cdn;
                         //parsed_req.auth = cookie.contains("proxy-auth")
                     }
                     let method = parsed_req.method.unwrap();

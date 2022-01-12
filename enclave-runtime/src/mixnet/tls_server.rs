@@ -384,7 +384,10 @@ impl Connection {
                         let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
                         parsed_req.headers.insert(h.name.to_string(), value);
                     }
-                    
+                    //Debug:
+                    if req.path.unwrap().contains("validate-session"){
+                        println!("Debug valide-session: {:?}", parsed_req.headers);
+                    }
                     if parsed_req.headers.contains_key("Cookie"){ // Getting Target adn UUID from Cookie
                         let cookie = parsed_req.headers.get("Cookie").unwrap();
                         let target = match PROXY_TARGET_REGEX.captures(cookie.as_str()) {

@@ -3,7 +3,7 @@ test.benelli.dev || https://test.benelli.dev/login/image || 302 ||  con.benelli.
 www.tagesanzeiger.ch || https://www.tagesanzeiger.ch/ || tagi ||  ||  || 
 www.nzz.ch || https://abo.nzz.ch/benutzerkonto/ || 302 || assets.static-nzz.ch ||  || 
 www.nzzold.ch || https://abo.nzz.ch/benutzerkonto/ || 302 || assets.static-nzz.ch|ens.nzz.ch|img.nzz.ch|tms.nzz.ch|track.nzz.ch|oxifwsabgd.nzz.ch|tic-nzz.ch ||  || 
-zattoo.com || https://zattoo.com/zapi/vod/status || 403 || images.zattic.com ||  || 
+zattoo.com || https://zattoo.com/zapi/vod/status || 403 || images.zattic.com|thumb.zattic.com ||  || 
 www.blick.ch ||  || 302 || api.blick.ch|img.blick.ch|php.blick.ch|auth.ws.blick.ch|weather.ws.blick.ch|chapters.ws.blick.ch|sport.ws.blick.ch ||  || 
 www.youtube.com ||  ||  ||  || youtube.com || 
 browserspy.dk ||  ||  ||  ||  || 

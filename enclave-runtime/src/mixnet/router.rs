@@ -74,8 +74,11 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         if parsed_req.path.unwrap().contains("zahs.tv") {
                             parsed_req.target = Some(String::from("zattoo.com"));
                             proxy(parsed_req)
+                       /* } else  if {
+                            parsed_req.target = Some(String::from("tagesanzeiger.ch"));
+                            proxy(parsed_req)*/
                         } else {
-                            println!("Debug: sw js {:?}", parsed_req);
+                            //println!("Debug: sw js {:?}", parsed_req);
                             not_found()
                         }
 

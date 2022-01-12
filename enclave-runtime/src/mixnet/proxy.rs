@@ -104,10 +104,19 @@ lazy_static! {
                 navigator.serviceWorker.getRegistrations().then( function(registrations) { for(let registration of registrations) { registration.unregister(); } }); 
                 }
                 document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
+                document.cookie = \"proxy-zattoo-cdn=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
                 window.location.href = '/';
             });
             document.body.prepend(btn);
+
+            document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
+            document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
         }
+        $(document).ready(function(){
+            document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
+            document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
+        
+        }); 
         </script>";
         format!("{}{}{}\n{}\n{}\n", head_base, HTTPS_BASE_URL, base_char, style, script)
     };
@@ -169,6 +178,7 @@ lazy_static! {
         (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
         (String::from("DNT"), String::from("1")),
         (String::from("Cache-Control"), String::from("no-cache")),
+        (String::from("Referer"), String::from("https://www.tagesanzeiger.ch/"))
         //(String::from("Cookie"), String::from("pzuid=e8d084518706744c0d45d166e020266d5e5ec489f8429ad4bb454844c86c3b7561c8999c; beaker.session.id=525f092dfd55682e2f90a6faaf4fe47d8d881713gAJ9cQEoVQdfZG9tYWlucQJOVQ5fY3JlYXRpb25fdGltZXEDR0HYcidZTrS3VQNfaWRxBFVAODU2NTRhY2RmZDRiMGIzODk1Mzk4NTI3ZWNiYzZmMmUyZWU5ZTA5NTJkMjI5ZjkyZTMxY2I2YzBkNjA0OWU0ZHEFVQ5fYWNjZXNzZWRfdGltZXEGR0HYcl00hXVYWA8AAABzZXNzaW9uX3ZlcnNpb25xB0sCVQVfcGF0aHEIVQEvdS4="))
     ]};
 }
@@ -279,6 +289,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
     headers.insert("Content-Type", content_type);
     headers.insert("Access-Control-Allow-Origin", "*");
+    headers.insert("Access-Control-Allow-Credentials", "true");
     //let default_cookies = String::from("");
     //let cookies = res.headers().get("set-cookie").unwrap_or(&default_cookies);
     //headers.insert("Set-Cookie", cookies);
@@ -291,7 +302,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         Some(res) => {
             let url = res.get(1).unwrap().as_str();
             //let datetime= Instant::now() + Duration::from_secs(7200);
-            let dt = OffsetDateTime::now_utc()+Duration::from_secs(7200);
+            let dt = OffsetDateTime::now_utc()+Duration::from_secs(3);
             //println!("{:?}", datetime.toUTCString());
             let val = format!("proxy-zattoo-cdn={}; Expires={}; Max-Age=3600; Path=/; SameSite=None; Secure", url, dt);
             headers.insert("Set-cookie", &val);
@@ -338,8 +349,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         String::from("Redirect").as_bytes().to_vec()
     } else if status_code.is_client_err() { // 400-499 Client Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
-        println!("DEBUG INFOS MEthod: {:?}", req.method);
-        println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
+        //println!("DEBUG INFOS MEthod: {:?}", req.method);
+        //println!("Response: {:?}", String::from_utf8(body_original.to_vec()));
         body_original.to_vec()
         //String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
@@ -379,8 +390,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     //println!("addr: {:?}", addr);
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     //create timeout time
-    const READ_TO: Option<Duration> = Some(Duration::from_secs(5));
-    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(5));
+    const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
+    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
 
     //Connect to remote host
     let stream = TcpStream::connect(conn_addr).unwrap();
@@ -413,7 +424,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         },
         Err(e) => {
             println!("Couldn't handle request: {:?}", e);
-            const HEAD: &[u8; 102] = b"HTTP/1.1 200 OK\r\n\
+            println!("Debug: Addr: {:?} \n\n", addr);
+            const HEAD: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
                          Date: Sat, 11 Jan 2003 02:44:04 GMT\r\n\
                          Content-Type: text/html\r\n\
                          Content-Length: 100\r\n\r\n";

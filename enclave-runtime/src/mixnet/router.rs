@@ -70,14 +70,25 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         //handle_routes(base_path.as_str(), parsed_req)
                         not_found()
                     } else {*/
-                        println!("Error, No Cookie was set and : {}", e);
                         if parsed_req.path.unwrap().contains("zahs.tv") {
                             parsed_req.target = Some(String::from("zattoo.com"));
+                            proxy(parsed_req) 
+                        } else if parsed_req.path.unwrap().contains("prod.tda.link") {
+                            parsed_req.target = Some(String::from("www.tagesanzeiger.ch"));
                             proxy(parsed_req)
-                       /* } else  if {
-                            parsed_req.target = Some(String::from("tagesanzeiger.ch"));
-                            proxy(parsed_req)*/
+                        }
+                        else if parsed_req.method.unwrap().contains("OPTIONS") {
+                            if parsed_req.path.unwrap().contains("disco")||parsed_req.path.unwrap().contains("prod.tda.link"){
+                                parsed_req.target = Some(String::from("www.tagesanzeiger.ch"));
+                                proxy(parsed_req)
+                            } else {
+                                println!("Error-Options request: {}", e);
+
+                                not_found()
+                            }
                         } else {
+                            println!("Error, No Cookie was set and : {}", e);
+
                             //println!("Debug: sw js {:?}", parsed_req);
                             not_found()
                         }

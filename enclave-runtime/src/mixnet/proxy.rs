@@ -2,7 +2,7 @@
 use sgx_tstd as std;
 //use crate::mixnet::router;
 use crate::mixnet::tls_server::Request;
-use http_req::{request::{RequestBuilder, Method}, tls, uri::Uri, response::{Response, Headers}};
+use http_req::{request::{RequestBuilder, Method}, tls, uri::Uri, response::{Response, Headers, StatusCode}};
 //use http_req::response::Headers;
 use std::net::TcpStream;
 use std::{
@@ -24,11 +24,12 @@ use std::collections::HashMap;
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
-use cookie::Cookie;
-use std::time::{Duration, Instant};
+//use cookie::Cookie;
+use std::time::{Duration};
 use time::OffsetDateTime;
-use chrono::prelude::*;
-use std::sync::atomic::{AtomicU8, Ordering};
+//use chrono::prelude::*;
+//use std::sync::atomic::{AtomicU8, Ordering*/};
+use urlencoding::decode;
 
 #[derive(Clone,Debug)]
 pub struct Domain {
@@ -48,7 +49,7 @@ pub struct Domain {
 }
 
 // Debug counter
-static COUNTER: AtomicU8 = AtomicU8::new(0);
+//static COUNTER: AtomicU8 = AtomicU8::new(0);
 /*
 ------------------------
 Helper Funcs and Var
@@ -96,6 +97,7 @@ lazy_static! {
         let style = "<style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>";
         let script = "<script type=\"text/javascript\"> 
         window.onload = function () {
+           
             let btn = document.createElement(\"button\");
             btn.className += \"proxy_target_logout\";
             btn.innerHTML = \"Cancel this session\";
@@ -111,12 +113,24 @@ lazy_static! {
 
             document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
             document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-        }
-        $(document).ready(function(){
-            document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-            document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
         
-        }); 
+
+        }
+
+        //tagesanzeiger reload
+        const observer = new MutationObserver(function(mutations_list) {
+            mutations_list.forEach(function(mutation) {
+                mutation.addedNodes.forEach(function(added_node) {
+                    if(added_node.innerHTML.includes(\"(CSR)\")){
+                        location.reload();
+                    }
+                    console.log(added_node);
+                });
+            });
+        });
+        observer.observe(document.querySelector(\"#__next\"), { subtree: false, childList: true });
+
+
         </script>";
         format!("{}{}{}\n{}\n{}\n", head_base, HTTPS_BASE_URL, base_char, style, script)
     };
@@ -158,12 +172,14 @@ lazy_static! {
     static ref HEADERS: Vec<String> = {vec![
         String::from("Accept"),
         String::from("Accept-Charset"),
+        String::from("Authorization"),
         //String::from("Accept-Encoding"),
         String::from("Connection"),
         String::from("Access-Control-Allow-Origin"),
         //String::from("Cookie"), // Will be calculated later
 
-        String::from("content-type")
+        String::from("Content-type"),
+        //String::from("Cookie")
         //String::from("Sec-Fetch-Dest"),
         /*
         String::from("Sec-Fetch-Dest"),
@@ -178,7 +194,8 @@ lazy_static! {
         (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
         (String::from("DNT"), String::from("1")),
         (String::from("Cache-Control"), String::from("no-cache")),
-        (String::from("Referer"), String::from("https://www.tagesanzeiger.ch/"))
+       // (String::from("Origin"), String::from("https://www.tagesanzeiger.ch/")),
+        //(String::from("Referer"), String::from("https://www.tagesanzeiger.ch/"))
         //(String::from("Cookie"), String::from("pzuid=e8d084518706744c0d45d166e020266d5e5ec489f8429ad4bb454844c86c3b7561c8999c; beaker.session.id=525f092dfd55682e2f90a6faaf4fe47d8d881713gAJ9cQEoVQdfZG9tYWlucQJOVQ5fY3JlYXRpb25fdGltZXEDR0HYcidZTrS3VQNfaWRxBFVAODU2NTRhY2RmZDRiMGIzODk1Mzk4NTI3ZWNiYzZmMmUyZWU5ZTA5NTJkMjI5ZjkyZTMxY2I2YzBkNjA0OWU0ZHEFVQ5fYWNjZXNzZWRfdGltZXEGR0HYcl00hXVYWA8AAABzZXNzaW9uX3ZlcnNpb25xB0sCVQVfcGF0aHEIVQEvdS4="))
     ]};
 }
@@ -257,7 +274,7 @@ pub fn parse_target_uri(req: & Request) -> Uri {
         Some(res) => { 
             let url = res.get(1).unwrap().as_str().to_string();
             if url.starts_with("https") {
-                url
+                decode(&url).unwrap().to_string()
             } else {
                 let mut prep_https = String::from("https://");
                 prep_https+= &url;
@@ -287,9 +304,38 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let reason = res.reason();
     let default_content_type = String::from("text/plain");
     let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
+    let mut body = String::new().as_bytes().to_vec();
+    if status_code.eq(&StatusCode::new(204)) && req.method.unwrap().eq("OPTIONS"){
+        headers.insert("Access-Control-Allow-Origin", "https://localhost:8443/");
+        //headers.insert("Date", "Mon, 16 Jan 2022 11:23:04 GMT");
+        //headers.insert("Access-Control-Allow-Origin", );
+        headers.insert("Access-Control-Allow-Credentials", "true");
+        headers.insert("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+        headers.insert("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type, authorization");
+        headers.insert("Access-Control-Allow-Max-Age", "86400");
+        headers.insert("Vary", "Origin");
+        let status_line = format!("{} {} {}", version, status_code, reason);
+        return Ok((status_line, headers, body))
+
+    }
     headers.insert("Content-Type", content_type);
+    headers.insert("Vary", "Origin");
+    /*
+    headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL);
+
+    
+    headers.insert("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    headers.insert("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type, Origin, Authorization, Accept-Encoding");
+    headers.insert("Access-Control-Allow-Max-Age", "86400");
+    headers.insert("Cache-Control", "no-cache");
+    */
     headers.insert("Access-Control-Allow-Origin", "*");
     headers.insert("Access-Control-Allow-Credentials", "true");
+
+/*
+    if req.path.unwrap().contains("validate-session") {
+        println!("Debug: Tagesanzeiger response: {:?}", res);
+    } */
     //let default_cookies = String::from("");
     //let cookies = res.headers().get("set-cookie").unwrap_or(&default_cookies);
     //headers.insert("Set-Cookie", cookies);
@@ -311,14 +357,18 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         _ => {}
     }
 
-    let body = if status_code.is_success() { // StatusCode 200 - 299
+    body = if status_code.is_success() { // StatusCode 200 - 299
         try_zatto_res(&res, & mut headers);
+
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
-                    
-                    clean = if content_type.contains("html"){
+                    clean = if content_type.contains("script") && req.target.as_ref().unwrap().contains("tagesanzeiger"){
+                        let int_re = Regex::new("http(?:s?)://(?:www.)?").unwrap();
+
+                        regex_replace_all_wrapper(&int_re, &clean, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+                    } else if content_type.contains("html"){
                         add_base_tag(&clean).unwrap()
                     } else {
                         clean
@@ -388,6 +438,7 @@ HTTP Requests
 pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(String, String)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
     //println!("addr: {:?}", addr);
+    //let backup_addr = decode(addr.host().unwrap()).unwrap();
     let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
     //create timeout time
     const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
@@ -412,29 +463,39 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         request.header(&header.0, &header.1);
     };
     //println!("{:?}", request);
-    
+    //early exiting Options request from tagi
+    //let path = String::from(addr.path())
+    if method.eq(&Method::OPTIONS) && (addr.path().unwrap().contains("disco")||addr.host().unwrap().contains("prod.tda.link")){
+        println!("Early exiting tagi disco preflights");
+        const HEAD: &[u8; 26] = b"HTTP/1.1 204 No Content \r\n";
 
-    request.header("Content-Length", &body.as_bytes().len())
+        let response = Response::from_head(HEAD).unwrap();
+        Ok((response, writer))
+
+    } else {
+        request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
-    //println!("{:?}", addr.path());
-    let temp = request.send(&mut stream, &mut writer);
-    match temp {
-        Ok(response) => {
-            Ok((response, writer)) // return response & body
-        },
-        Err(e) => {
-            println!("Couldn't handle request: {:?}", e);
-            println!("Debug: Addr: {:?} \n\n", addr);
-            const HEAD: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
-                         Date: Sat, 11 Jan 2003 02:44:04 GMT\r\n\
-                         Content-Type: text/html\r\n\
-                         Content-Length: 100\r\n\r\n";
+        let path = addr.path().unwrap_or("");
+       // if path.contains("content") {println!("Debug request {:?}", request);}
+        let temp = request.send(&mut stream, &mut writer);
+        match temp {
+            Ok(response) => {
+                Ok((response, writer)) // return response & body
+            },
+            Err(e) => {
+                println!("Couldn't handle request: {:?}", e);
+                //println!("Debug: Addr: {:?} \n\n", addr);
+                //println!("Request send: {:?}", request);
+                const HEAD: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
+                            Date: Sat, 11 Jan 2003 02:44:04 GMT\r\n\
+                            Content-Type: text/html\r\n\
+                            Content-Length: 100\r\n\r\n";
 
-            let response = Response::from_head(HEAD).unwrap();
-            Ok((response, writer))
+                let response = Response::from_head(HEAD).unwrap();
+                Ok((response, writer))
+            }
         }
     }
-
 }
 
 /*

@@ -385,9 +385,14 @@ impl Connection {
                         parsed_req.headers.insert(h.name.to_string(), value);
                     }
                     //Debug:
+                    //println!("Debug valide-headers: {:?}", parsed_req.headers);
+                    /*
                     if req.path.unwrap().contains("validate-session"){
-                        println!("Debug valide-session: {:?}", parsed_req.headers);
-                    }
+                        println!("Debug valide-headers: {:?}", parsed_req.headers);
+                        println!("Debug valide-method: {:?}", parsed_req.method);
+                        println!("Debug valide-path: {:?}", parsed_req.path);
+
+                    }*/
                     if parsed_req.headers.contains_key("Cookie"){ // Getting Target adn UUID from Cookie
                         let cookie = parsed_req.headers.get("Cookie").unwrap();
                         let target = match PROXY_TARGET_REGEX.captures(cookie.as_str()) {

@@ -181,6 +181,7 @@ lazy_static! {
         //String::from("Cookie"), // Will be calculated later
 
         String::from("Content-type"),
+        String::from("content-type"),
         //String::from("Cookie")
         //String::from("Sec-Fetch-Dest"),
         /*
@@ -307,6 +308,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let default_content_type = String::from("text/plain");
     let content_type = res.headers().get("Content-Type").unwrap_or(&default_content_type);
     let mut body = String::new().as_bytes().to_vec();
+    let path = req.path.unwrap();
+    let target = req.target.as_ref().unwrap();
     if status_code.eq(&StatusCode::new(204)) && req.method.unwrap().eq("OPTIONS"){
         headers.insert("Access-Control-Allow-Origin", "https://localhost:8443/");
         //headers.insert("Date", "Mon, 16 Jan 2022 11:23:04 GMT");
@@ -322,8 +325,12 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     }
     headers.insert("Content-Type", content_type);
     headers.insert("Vary", "Origin");
+    if target.contains("zattoo") {
+        headers.insert("Access-Control-Allow-Origin", "*");
+    } else {
+        headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL);
+    }
     
-    headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL);
 
     
     headers.insert("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
@@ -345,7 +352,6 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
 
     //Zattoo extra logic
     let regex = Regex::new("set-proxy-zattoo=([^&]*)").unwrap();
-    let path = req.path.unwrap();
     match regex.captures(path) {
         Some(res) => {
             let url = res.get(1).unwrap().as_str();
@@ -366,7 +372,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
-                    clean = if content_type.contains("script") && req.target.as_ref().unwrap().contains("tagesanzeiger"){
+                    clean = if content_type.contains("script") && target.contains("tagesanzeiger"){
                         let int_re = Regex::new("http(?:s?)://(?:www.)?").unwrap();
 
                         regex_replace_all_wrapper(&int_re, &clean, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))

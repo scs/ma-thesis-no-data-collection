@@ -2,7 +2,7 @@
 use sgx_tstd as std;
 //use crate::mixnet::router;
 use crate::mixnet::tls_server::Request;
-use http_req::{request::{RequestBuilder, Method}, tls, uri::Uri, response::{Response, Headers, StatusCode}};
+use http_req::{request::{RequestBuilder, Method}, tls, tls::Conn, uri::Uri, response::{Response, Headers, StatusCode}};
 //use http_req::response::Headers;
 use std::net::TcpStream;
 use std::{
@@ -30,6 +30,8 @@ use time::OffsetDateTime;
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
 use urlencoding::decode;
+//use core::borrow::{BorrowMut, Borrow};
+//use std::sync::Arc;
 
 #[derive(Clone,Debug)]
 pub struct Domain {
@@ -56,6 +58,20 @@ Helper Funcs and Var
 ------------------------
 */
 lazy_static! {
+    static ref PROXY_TLS_CONN: Mutex<HashMap<String, Conn<std::net::TcpStream>>> = {
+        let mut m = HashMap::new();/*
+        //let tls_session = lines_from_file("ma-thesis/tls_sessions.txt", 1);
+        let a = String::from("https://test.benelli.dev");
+        let addr: Uri = a.parse().unwrap();
+        let port: u16 = 443;
+        let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+
+        let stream = create_tcp_stream(&conn_addr, &addr);
+        let host = String::from(addr.host().unwrap());
+        m.insert(host, stream);*/
+
+        Mutex::new(m)
+    };
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
 //        static ref PROXY_URLS: Mutex<HashMap<String, Domain<'static>>> = {
         let mut m = HashMap::new();
@@ -176,7 +192,7 @@ lazy_static! {
         String::from("Accept-Charset"),
         String::from("Authorization"),
         //String::from("Accept-Encoding"),
-        String::from("Connection"),
+        //String::from("Connection"),
         //String::from("Access-Control-Allow-Origin"),
         //String::from("Cookie"), // Will be calculated later
 
@@ -197,6 +213,7 @@ lazy_static! {
         (String::from("User-Agent"), String::from("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")),
         (String::from("DNT"), String::from("1")),
         (String::from("Cache-Control"), String::from("no-cache")),
+        (String::from("Connection"), String::from("keep-alive")),
        // (String::from("Origin"), String::from("https://www.tagesanzeiger.ch/")),
         //(String::from("Referer"), String::from("https://www.tagesanzeiger.ch/"))
         //(String::from("Cookie"), String::from("pzuid=e8d084518706744c0d45d166e020266d5e5ec489f8429ad4bb454844c86c3b7561c8999c; beaker.session.id=525f092dfd55682e2f90a6faaf4fe47d8d881713gAJ9cQEoVQdfZG9tYWlucQJOVQ5fY3JlYXRpb25fdGltZXEDR0HYcidZTrS3VQNfaWRxBFVAODU2NTRhY2RmZDRiMGIzODk1Mzk4NTI3ZWNiYzZmMmUyZWU5ZTA5NTJkMjI5ZjkyZTMxY2I2YzBkNjA0OWU0ZHEFVQ5fYWNjZXNzZWRfdGltZXEGR0HYcl00hXVYWA8AAABzZXNzaW9uX3ZlcnNpb25xB0sCVQVfcGF0aHEIVQEvdS4="))
@@ -445,32 +462,43 @@ HTTP Requests
 
 pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, body: &String, headers: &Vec<(String, String)>) -> IOResult<(Response, Vec<u8>)>{
     //Construct a domain:ip string for tcp connection
-    //println!("addr: {:?}", addr);
-    //let backup_addr = decode(addr.host().unwrap()).unwrap();
-    let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-    //create timeout time
-    const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
-    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
-
-    //Connect to remote host
-    let stream = TcpStream::connect(conn_addr).unwrap();
-    stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
-    stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
-    //Open secure connection over TlsStream, because of `addr` (https)
-    let mut stream = tls::Config::default()
-        .connect(addr.host().unwrap_or(""), stream)
-        .unwrap();
     //Container for re§ponse's body
     let mut writer = Vec::new();
     let mut request = RequestBuilder::new(&addr)
         .method(method).to_owned();
-        
-        
+    // get TLS Session
+    let mut map = PROXY_TLS_CONN.lock().unwrap();
+    let host = String::from(addr.host().unwrap());
+    let mut stream = if map.contains_key(&host as &str){
+        //println!("Reusing TLS Connection");
+        map.get_mut(&host as &str).unwrap()
+    } else {
+        drop(map); // release lock, to add new tls stream
+        //println!("Adding new Connection");
+        let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+        const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
+        const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
+    
+        //Connect to remote host
+        let stream = TcpStream::connect(conn_addr).unwrap();
+        stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
+        stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
+        //Open secure connection over TlsStream, because of `addr` (https)
+        let mut stream = tls::Config::default()
+            .connect(addr.host().unwrap_or(""), stream)
+            .unwrap();
+        insert_tls_stream(host, stream);
+        //println!("Added");
+        map = PROXY_TLS_CONN.lock().unwrap();
+        map.get_mut(&addr.host().unwrap() as &str).unwrap()
+
+    };
+
     // Fill in Headers
     for header in headers {
         request.header(&header.0, &header.1);
     };
-    //println!("{:?}", request);
+    //println!("{:?}, \n addr:2 {:?} \n",addr.host(), addr2.host() );
     //early exiting Options request from tagi
     //let path = String::from(addr.path())
     if method.eq(&Method::OPTIONS) && (addr.path().unwrap().contains("disco")||addr.host().unwrap().contains("prod.tda.link")){
@@ -504,6 +532,49 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
             }
         }
     }
+}
+/*
+pub fn get_tcp_stream<'a>(addr: & 'static Uri, port: u16) -> & 'static Conn<std::net::TcpStream> {
+    let conn_addr: & 'static String = &format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+    //create timeout time
+    let conn_addr_copy = conn_addr.clone();
+    let mut map = PROXY_TLS_CONN.lock().unwrap();
+    if !map.contains_key(&conn_addr as &str){
+        const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
+        const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
+    
+        //Connect to remote host
+        let stream = TcpStream::connect(conn_addr).unwrap();
+        stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
+        stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
+        //Open secure connection over TlsStream, because of `addr` (https)
+        let mut stream = tls::Config::default()
+            .connect(addr.host().unwrap_or(""), stream)
+            .unwrap();
+        map.insert(conn_addr_copy, &stream);
+    } 
+    let stream: &Conn<std::net::TcpStream> = *map.get_mut(&conn_addr as &str).unwrap();
+    stream
+}
+*/
+pub fn insert_tls_stream(host: String, stream: Conn<std::net::TcpStream>){
+    let mut map = PROXY_TLS_CONN.lock().unwrap();
+    map.insert(host, stream);
+    drop(map);
+}
+
+pub fn create_tcp_stream(conn_addr: &String, addr: &Uri) -> Conn<std::net::TcpStream> {    
+    const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
+    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
+
+    //Connect to remote host
+    let stream = TcpStream::connect(conn_addr).unwrap();
+    stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
+    stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
+    //Open secure connection over TlsStream, because of `addr` (https)
+    tls::Config::default()
+        .connect(addr.host().unwrap_or(""), stream)
+        .unwrap()
 }
 
 /*
@@ -540,7 +611,7 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
 pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
-    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Close")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
     let status_code = response.status_code();
     match target_domain.login_check_answer.as_str() {
         "302" => {

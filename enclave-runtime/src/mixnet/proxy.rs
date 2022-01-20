@@ -114,21 +114,23 @@ lazy_static! {
             document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
             document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
         
-
+            if(document.head.innerHTML.includes(\"tagesanzeiger.ch\")){
+                //tagesanzeiger reload
+                const observer = new MutationObserver(function(mutations_list) {
+                    mutations_list.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(added_node) {
+                            if(added_node.innerHTML.includes(\"(CSR)\")){
+                                location.reload();
+                            }
+                            console.log(added_node);
+                        });
+                    });
+                });
+                observer.observe(document.querySelector(\"#__next\"), { subtree: false, childList: true });
+        
+            }
         }
 
-        //tagesanzeiger reload
-        const observer = new MutationObserver(function(mutations_list) {
-            mutations_list.forEach(function(mutation) {
-                mutation.addedNodes.forEach(function(added_node) {
-                    if(added_node.innerHTML.includes(\"(CSR)\")){
-                        location.reload();
-                    }
-                    console.log(added_node);
-                });
-            });
-        });
-        observer.observe(document.querySelector(\"#__next\"), { subtree: false, childList: true });
 
 
         </script>";
@@ -175,7 +177,7 @@ lazy_static! {
         String::from("Authorization"),
         //String::from("Accept-Encoding"),
         String::from("Connection"),
-        String::from("Access-Control-Allow-Origin"),
+        //String::from("Access-Control-Allow-Origin"),
         //String::from("Cookie"), // Will be calculated later
 
         String::from("Content-type"),
@@ -320,7 +322,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     }
     headers.insert("Content-Type", content_type);
     headers.insert("Vary", "Origin");
-    /*
+    
     headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL);
 
     
@@ -328,8 +330,8 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     headers.insert("Access-Control-Allow-Headers", "X-PINGOTHER, Content-Type, Origin, Authorization, Accept-Encoding");
     headers.insert("Access-Control-Allow-Max-Age", "86400");
     headers.insert("Cache-Control", "no-cache");
-    */
-    headers.insert("Access-Control-Allow-Origin", "*");
+    //*/
+    //headers.insert("Access-Control-Allow-Origin", "*");
     headers.insert("Access-Control-Allow-Credentials", "true");
 
 /*

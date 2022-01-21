@@ -2,7 +2,7 @@
 use sgx_tstd as std;
 //use crate::mixnet::router;
 use crate::mixnet::tls_server::Request;
-use http_req::{request::{RequestBuilder, Method}, tls, tls::Conn, uri::Uri, response::{Response, Headers, StatusCode}};
+use http_req::{request::{RequestBuilder, Method}, tls, tls::Conn, uri::Uri, response::{Response, Headers, StatusCode}, error::Error as ReqError};
 //use http_req::response::Headers;
 use std::net::TcpStream;
 use std::{
@@ -32,6 +32,16 @@ use time::OffsetDateTime;
 use urlencoding::decode;
 //use core::borrow::{BorrowMut, Borrow};
 //use std::sync::Arc;
+const HEAD_503: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
+                            Date: Sat, 16 Jan 2022 12:44:04 GMT\r\n\
+                            Content-Type: text/html\r\n\
+                            Content-Length: 100\r\n\r\n";
+
+const _DUR_HALF_SEC: Option<Duration> = Some(Duration::from_millis(500));
+const _DUR_ONE_SEC: Option<Duration> = Some(Duration::from_millis(1000));
+const _DUR_ONE_AND_HALF_SEC: Option<Duration> = Some(Duration::from_millis(1000));
+const _DUR_TWO_SEC: Option<Duration> = Some(Duration::from_millis(2000));
+const DUR_FIVE_SEC: Option<Duration> = Some(Duration::from_millis(2000));
 
 #[derive(Clone,Debug)]
 pub struct Domain {
@@ -59,7 +69,7 @@ Helper Funcs and Var
 */
 lazy_static! {
     static ref PROXY_TLS_CONN: Mutex<HashMap<String, Conn<std::net::TcpStream>>> = {
-        let mut m = HashMap::new();/*
+        let m = HashMap::new();/*
         //let tls_session = lines_from_file("ma-thesis/tls_sessions.txt", 1);
         let a = String::from("https://test.benelli.dev");
         let addr: Uri = a.parse().unwrap();
@@ -284,11 +294,12 @@ pub fn parse_target_uri(req: & Request) -> Uri {
     let path = req.path.unwrap();
     //println!("Targeting: {}", path);
     let https_url = if path.contains("track_audio") | path.contains("track_video") {
+        //println!("zattoo track path: {:?}", path);
         let backup = format!("{}/", HTTPS_BASE_URL);
         let cdn = req.zattoo_cdn.as_ref().unwrap_or(&backup);
-        let cdn_build = &cdn[0..cdn.len()-1];
-        let test = format!("{}{}", cdn_build,path );
-        test
+        //let cdn_build = &cdn[0..cdn.len()-1];
+        let reconstructed_path = format!("{}{}", cdn,path );
+        reconstructed_path
     } else {
         match regex.captures(path) {
         Some(res) => { 
@@ -358,41 +369,32 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     //headers.insert("Access-Control-Allow-Origin", "*");
     headers.insert("Access-Control-Allow-Credentials", "true");
 
-/*
-    if req.path.unwrap().contains("validate-session") {
-        println!("Debug: Tagesanzeiger response: {:?}", res);
-    } */
-    //let default_cookies = String::from("");
-    //let cookies = res.headers().get("set-cookie").unwrap_or(&default_cookies);
-    //headers.insert("Set-Cookie", cookies);
-    //println!("Response: {:?}", res);
-
-    //Zattoo extra logic
-    let regex = Regex::new("set-proxy-zattoo=([^&]*)").unwrap();
-    match regex.captures(path) {
-        Some(res) => {
-            let url = res.get(1).unwrap().as_str();
-            //let datetime= Instant::now() + Duration::from_secs(7200);
-            let dt = OffsetDateTime::now_utc()+Duration::from_secs(3);
-            //println!("{:?}", datetime.toUTCString());
-            let val = format!("proxy-zattoo-cdn={}; Expires={}; Max-Age=3600; Path=/; SameSite=None; Secure", url, dt);
-            headers.insert("Set-cookie", &val);
-            //println!("Inserted: {}", val);
-        },
-        _ => {}
-    }
-
     body = if status_code.is_success() { // StatusCode 200 - 299
         try_zatto_res(&res, & mut headers);
 
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
+
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
                     clean = if content_type.contains("script") && target.contains("tagesanzeiger"){
                         let int_re = Regex::new("http(?:s?)://(?:www.)?").unwrap();
 
                         regex_replace_all_wrapper(&int_re, &clean, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+                    } else if path.contains("zapi/watch/") && body_string.contains("zahs.tv"){
+                        // get ressource path
+                        let cookie_re = Regex::new("(http(?:s?)://[^.]*.zahs.tv/[^/.]*)/m.mpd").unwrap();
+                        let zattoo_cookie = cookie_re.captures(&clean).unwrap().get(1).unwrap().as_str();
+                        //println!("before: {}", zattoo_cookie);
+                        //create Cookie HEader as return
+                        let dt = OffsetDateTime::now_utc()+Duration::from_secs(3600);
+                        let val = format!("proxy-zattoo-cdn={}; Expires={}; Max-Age=3600; Path=/; SameSite=None; Secure", zattoo_cookie, dt);
+                        headers.insert("Set-cookie", &val);
+
+                        //regex paths
+                        let int_re = Regex::new("(http(?:s?)://[^.]*.zahs.tv)").unwrap();
+                        regex_replace_all_wrapper(&int_re, &clean, &format!("{}/?proxy_sub=$0", HTTPS_BASE_URL))
+
                     } else if content_type.contains("html"){
                         add_base_tag(&clean).unwrap()
                     } else {
@@ -466,33 +468,6 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     let mut writer = Vec::new();
     let mut request = RequestBuilder::new(&addr)
         .method(method).to_owned();
-    // get TLS Session
-    let mut map = PROXY_TLS_CONN.lock().unwrap();
-    let host = String::from(addr.host().unwrap());
-    let mut stream = if map.contains_key(&host as &str){
-        //println!("Reusing TLS Connection");
-        map.get_mut(&host as &str).unwrap()
-    } else {
-        drop(map); // release lock, to add new tls stream
-        //println!("Adding new Connection");
-        let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-        const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
-        const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
-    
-        //Connect to remote host
-        let stream = TcpStream::connect(conn_addr).unwrap();
-        stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
-        stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
-        //Open secure connection over TlsStream, because of `addr` (https)
-        let mut stream = tls::Config::default()
-            .connect(addr.host().unwrap_or(""), stream)
-            .unwrap();
-        insert_tls_stream(host, stream);
-        //println!("Added");
-        map = PROXY_TLS_CONN.lock().unwrap();
-        map.get_mut(&addr.host().unwrap() as &str).unwrap()
-
-    };
 
     // Fill in Headers
     for header in headers {
@@ -508,30 +483,96 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         let response = Response::from_head(HEAD).unwrap();
         Ok((response, writer))
 
-    } else {
+    } else if addr.host().unwrap().contains("localhost"){
+        println!("Early returning call to localhost");
+        Ok((return_503(), writer))
+    }
+    else {
+            let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
+
+            // get TLS Session
+            let mut map = PROXY_TLS_CONN.lock().unwrap();
+            let host = String::from(addr.host().unwrap());
+            let mut stream = if map.contains_key(&host as &str){
+                //println!("Reusing TLS Connection");
+                map.get_mut(&host as &str).unwrap()
+            } else {
+                drop(map); // release lock, to add new tls stream
+                //println!("Adding new Connection");
+               
+                let stream = create_tcp_stream(&conn_addr, &addr);
+                insert_tls_stream(&host, stream);
+                //println!("Added");
+                map = PROXY_TLS_CONN.lock().unwrap();
+                map.get_mut(&addr.host().unwrap() as &str).unwrap()
+
+            };
+            //drop(map);
+        //request.timeout(Some(Duration::from_millis(1500)));
         request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
-        let path = addr.path().unwrap_or("");
+        //let path = addr.path().unwrap_or("");
        // if path.contains("content") {println!("Debug request {:?}", request);}
+        let request_backup = request.clone();
         let temp = request.send(&mut stream, &mut writer);
-        match temp {
-            Ok(response) => {
-                Ok((response, writer)) // return response & body
-            },
-            Err(e) => {
-                println!("Couldn't handle request: {:?}", e);
-                //println!("Debug: Addr: {:?} \n\n", addr);
-                //println!("Request send: {:?}", request);
-                const HEAD: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
-                            Date: Sat, 11 Jan 2003 02:44:04 GMT\r\n\
-                            Content-Type: text/html\r\n\
-                            Content-Length: 100\r\n\r\n";
+        drop(map);
+        error_handling_request_builder(temp, request_backup, &conn_addr, &addr, writer)
 
-                let response = Response::from_head(HEAD).unwrap();
-                Ok((response, writer))
+    }
+}
+
+pub fn error_handling_request_builder(handle: Result<Response, ReqError>, request_backup: RequestBuilder,  conn_addr: &String, addr: &Uri, mut writer: Vec<u8>)-> IOResult<(Response, Vec<u8>)> {
+    match handle {
+        Ok(response) => {
+            Ok((response, writer)) // return response & body
+        },
+        Err(e) => {
+            let default_503 = return_503();
+            match e {
+                ReqError::IO(error) => {
+                    match error.kind() {
+                        ErrorKind::BrokenPipe => {
+                            println!("Broken Pipe, reopen TLS Connection");
+                            let stream = create_tcp_stream(&conn_addr, &addr);
+                            
+                            insert_tls_stream(&addr.host().unwrap().to_string(), stream);
+                            writer = Vec::new();
+                            let mut map = PROXY_TLS_CONN.lock().unwrap();
+                            let mut stream = map.get_mut(&addr.host().unwrap() as &str).unwrap();
+                            let request = request_backup.clone();
+                            let temp = request.send(&mut stream, &mut writer);
+                            drop(map);
+                            error_handling_request_builder(temp, request_backup, conn_addr, addr, writer)
+                        },
+                        ErrorKind::WouldBlock => {
+                            println!("Wouldblock on conn_addr: {}", conn_addr);
+                            //let response = return_503();
+                            Ok((default_503, writer))
+                        }
+                        _ => {
+                            println!("Request IOError (default 503), Kind: {:?}, ", error.kind());
+                            //let response = return_503();
+                            Ok((default_503, writer))
+                        }
+                    }
+                }
+                ReqError::Parse(ref error) => {
+                    println!("Request Parse Error (default 503): {:?}", error);
+                    //println!("request send: {:?}", request_backup);
+                    Ok((default_503, writer))
+                }
+                _ => {
+                    println!("Request TLS  Error (default 503): {:?}", e);
+                    //let response = return_503();
+                    Ok((default_503, writer))
+                }
             }
         }
     }
+}
+
+pub fn return_503()-> Response {
+    Response::from_head(HEAD_503).unwrap()
 }
 /*
 pub fn get_tcp_stream<'a>(addr: & 'static Uri, port: u16) -> & 'static Conn<std::net::TcpStream> {
@@ -557,20 +598,28 @@ pub fn get_tcp_stream<'a>(addr: & 'static Uri, port: u16) -> & 'static Conn<std:
     stream
 }
 */
-pub fn insert_tls_stream(host: String, stream: Conn<std::net::TcpStream>){
+pub fn insert_tls_stream(host: & String, stream: Conn<std::net::TcpStream>){
+    let key = String::from(host);
     let mut map = PROXY_TLS_CONN.lock().unwrap();
-    map.insert(host, stream);
+    map.insert(key, stream);
+
     drop(map);
 }
 
 pub fn create_tcp_stream(conn_addr: &String, addr: &Uri) -> Conn<std::net::TcpStream> {    
-    const READ_TO: Option<Duration> = Some(Duration::from_secs(2));
-    const WRITE_TO: Option<Duration> = Some(Duration::from_secs(2));
 
     //Connect to remote host
-    let stream = TcpStream::connect(conn_addr).unwrap();
-    stream.set_read_timeout(READ_TO).expect("set_read_timeout call failed");
-    stream.set_write_timeout(WRITE_TO).expect("set_write_timeout call failed");
+    let stream = TcpStream::connect(conn_addr).unwrap();/*
+    if conn_addr.contains("zahs.tv"){
+        stream.set_read_timeout(DUR_HALF_SEC).expect("set_read_timeout call failed");
+        stream.set_write_timeout(DUR_HALF_SEC).expect("set_write_timeout call failed");
+    } else {
+        stream.set_read_timeout(DUR_TWO_SEC).expect("set_read_timeout call failed");
+        stream.set_write_timeout(DUR_TWO_SEC).expect("set_write_timeout call failed");
+    }
+    */
+    stream.set_read_timeout(DUR_FIVE_SEC).expect("set_read_timeout call failed");
+    stream.set_write_timeout(DUR_FIVE_SEC).expect("set_write_timeout call failed");
     //Open secure connection over TlsStream, because of `addr` (https)
     tls::Config::default()
         .connect(addr.host().unwrap_or(""), stream)

@@ -70,10 +70,15 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         //handle_routes(base_path.as_str(), parsed_req)
                         not_found()
                     } else {*/
+                        
+                        /*
+                        Not needed anymore
                         if parsed_req.path.unwrap().contains("zahs.tv") {
+                            println!("forwareded zattoo");
                             parsed_req.target = Some(String::from("zattoo.com"));
                             proxy(parsed_req) 
-                        } else if parsed_req.path.unwrap().contains("prod.tda.link") {
+                        } else */
+                        if parsed_req.path.unwrap().contains("prod.tda.link") {
                             parsed_req.target = Some(String::from("www.tagesanzeiger.ch"));
                             proxy(parsed_req)
                         }

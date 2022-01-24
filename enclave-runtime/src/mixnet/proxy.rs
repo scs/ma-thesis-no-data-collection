@@ -319,7 +319,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     headers.insert("Content-Type", content_type);
     headers.insert("Vary", "Origin");
     if target.contains("zattoo") {
-        headers.insert("Access-Control-Allow-Origin", "*");
+        headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL); // before was set to *, think we can let this
     } else {
         headers.insert("Access-Control-Allow-Origin", HTTPS_BASE_URL);
     }
@@ -703,7 +703,6 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
                 ).unwrap();
             let bo = String::from_utf8(answer).unwrap();
             let abo_json: Value = serde_json::from_str(bo.as_str()).unwrap();
-            println!("Debug token {}", abo_json["hasAbo"]);
             /*
             if body.contains("abo-button") {
                 println!("Login successfull");
@@ -716,14 +715,7 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
               Value::Bool(bo) => {bo},
               _ => false
           }
-          /*
-          println!("{:?}", &abo_json["hasAbo"].unwrap());
-            if abo_json["hasAbo"].as_str().unwrap() == "true" {
-                true
-            } else {
-                false
-            }
-            //abo_json["hasAbo"]*/
+
         },
         "403" => {
             if status_code.is_client_err() {

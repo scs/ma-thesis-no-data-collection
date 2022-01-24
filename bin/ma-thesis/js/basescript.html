@@ -1,0 +1,72 @@
+
+    <style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>
+    <script type="text/javascript"> 
+        window.onload = function () {
+            window.setInterval(checkCookie, 1000);
+            let btn = document.createElement("button");
+            btn.className += "proxy_target_logout";
+            btn.innerHTML = "Cancel this session";
+            btn.addEventListener("click", function () {
+                if ("serviceWorker" in navigator) {
+                navigator.serviceWorker.getRegistrations().then( function(registrations) { for(let registration of registrations) { registration.unregister(); } }); 
+                }
+                document.cookie = "proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                document.cookie = "proxy-zattoo-cdn=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+                window.location.href = '/';
+            });
+            document.body.prepend(btn);
+
+            document.cookie = "uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+            document.cookie = "FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+        
+            if(document.head.innerHTML.includes("tagesanzeiger.ch")){
+                //tagesanzeiger reload
+                const observer = new MutationObserver(function(mutations_list) {
+                    mutations_list.forEach(function(mutation) {
+                        mutation.addedNodes.forEach(function(added_node) {
+                            if(added_node.innerHTML.includes("(CSR)")){
+                                location.reload();
+                            }
+                            console.log(added_node);
+                        });
+                    });
+                });
+                observer.observe(document.querySelector("#__next"), { subtree: false, childList: true });
+        
+            }
+        }
+        function checkCookie() {
+            if(getCookie("proxy-invalid-session") != null){
+                alert("Session invalid, you need to provide a new Cookie");
+                //console.log("Your session was invalidated");
+                setCookie("proxy-invalid-session", "", -1);
+                setCookie("proxy-zattoo-cdn", "", -1)
+                setCookie("proxy-target", "", -1);
+                window.location="https://localhost:8443";
+            }
+        }
+        function getCookie(name) {
+            var dc = document.cookie;
+            var prefix = name + "=";
+            var begin = dc.indexOf("; " + prefix);
+            if (begin === -1) {
+            begin = dc.indexOf(prefix);
+            if (begin !== 0) return null;
+            }
+            else{
+            begin += 2;
+            var end = document.cookie.indexOf(";", begin);
+            if (end === -1) {
+                end = dc.length;
+            }
+            }
+            return decodeURI(dc.substring(begin + prefix.length, end));
+        }
+
+        function setCookie(cname, cvalue, exhours) {
+            const d = new Date();
+            d.setTime(d.getTime() + (exhours*60*60*1000));
+            let expires = "expires="+ d.toUTCString();
+            document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;SameSite=None;Secure";
+        }
+    </script>

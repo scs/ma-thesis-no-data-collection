@@ -11,7 +11,9 @@ const STATUS_LINE_OK: &str = "HTTP/1.1 200 OK";
 const STATUS_LINE_NOT_FOUND: &str = "HTTP/1.1 404 NOT FOUND";
 const STATUS_LINE_UNAUTHORIZED: &str = "HTTP/1.1 401 UNAUTHORIZED";
 const STATUS_LINE_INTERNAL_SERVER_ERROR: &str = "HTTP/1.1 500 INTERNAL SERVER ERROR";
-
+//use crate::mixnet::{HTTPS_BASE_URL};
+use std::time::{Duration};
+use time::OffsetDateTime;
 //const STATUS_LINE_SERVER_ERROR: &str = "HTTP/1.1 500 OK";
 use http_req::response::{Headers};
 
@@ -38,6 +40,7 @@ pub fn load_all_routes() -> Router<String> {
     router.add("/", "index".to_string());
     router.add("/favicon.ico", "favicon".to_string());
     router.add("/favicon/:name", "favicon_special".to_string());
+    router.add("/unauthorized", "unauthorized".to_string());
     router
 }
 
@@ -56,6 +59,7 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                         "favicon_special" => get_favicon(route_match.params().find("name").unwrap()),
                         //"proxy" => proxy(req, true),
                         //"proxy_wo_route" => proxy(req, false),
+                        "unauthorized" => not_authorized(),
                         _ => not_found(),
                     }
                 },
@@ -117,7 +121,8 @@ pub fn handle_routes(path: &str, mut parsed_req: ParsedRequest)->IOResult<Vec<u8
                 proxy(parsed_req)
             } else { // not authorized traffic
                 //not_authorized() 
-                proxy(parsed_req) // only for testing reason, the line above should be used
+                cookie_validation_failed()
+                //proxy(parsed_req) // only for testing reason, the line above should be used
             }
         }
     }
@@ -138,6 +143,17 @@ pub fn not_authorized()->IOResult<Vec<u8>>{
     let contents = get_file_contents("not_authorized").unwrap();
     let mut headers = Headers::new();
     headers.insert("Set-Cookie", "proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;");
+    prepare_response(STATUS_LINE_UNAUTHORIZED, headers, contents)
+}
+
+pub fn cookie_validation_failed()->IOResult<Vec<u8>>{
+    let mut headers = Headers::new();
+    headers.insert("Set-Cookie", "proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;");
+    let dt = OffsetDateTime::now_utc()+Duration::from_secs(3600);
+    let inv_session = format!("proxy-invalid-session=true; expires={}; path=/;", dt);
+    headers.insert("Set-Cookie", &inv_session);
+    headers.insert("Content-type", "text/html");
+    let contents = get_file_contents("not_authorized").unwrap();
     prepare_response(STATUS_LINE_UNAUTHORIZED, headers, contents)
 }
 

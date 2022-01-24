@@ -20,13 +20,15 @@ use std::{
 //use std::io::prelude::*;
 use regex::Regex;
 use crate::mixnet::{HTTPS_BASE_URL, BASE_LOCALHOST_URL};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
 //use cookie::Cookie;
 use std::time::{Duration};
 use time::OffsetDateTime;
+use itp_sgx_io as io;
+
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
 use urlencoding::decode;
@@ -56,7 +58,8 @@ pub struct Domain {
     pub regex_subdomains: Option<Regex>,
     pub regex_subdomains_relative: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
-    pub auth_user: HashMap<String,String>
+    pub auth_user: HashSet<String>,
+    pub cookie_origin: HashMap<String, String>
  
 }
 
@@ -106,7 +109,8 @@ lazy_static! {
                 regex_subdomains: subdomains_regex,
                 regex_subdomains_relative: subdomains_regex_relative,
                 regex_general_subdomains: all_subdomains_regex,
-                auth_user: HashMap::new(),
+                auth_user: HashSet::new(),
+                cookie_origin: HashMap::new(),
             });
         };
         Mutex::new(m)
@@ -116,51 +120,11 @@ lazy_static! {
     static ref HEAD_REGEX: Regex = Regex::new("(?i)<head?[^>]>").unwrap();
     
     static ref PROTOCOL_RELATVE_REGEX: Regex  =Regex::new("\\?proxy_sub=//").unwrap();
-
     static ref REPLACE_HEAD_WITH: String = {
         let head_base = "<head> \n <base href=\"";
         let base_char = "/\"/>  \n <meta charset=\"utf-8\">";
-        let style = "<style> .proxy_target_logout {margin-top:3px; padding:10px; width: 100%; border:1px solid #CCC; max-width: 100%; background-color: red; color: white; position:fixed; bottom: 0px; left:0px; z-index: 2147483647;} </style>";
-        let script = "<script type=\"text/javascript\"> 
-        window.onload = function () {
-           
-            let btn = document.createElement(\"button\");
-            btn.className += \"proxy_target_logout\";
-            btn.innerHTML = \"Cancel this session\";
-            btn.addEventListener(\"click\", function () {
-                if (\"serviceWorker\" in navigator) {
-                navigator.serviceWorker.getRegistrations().then( function(registrations) { for(let registration of registrations) { registration.unregister(); } }); 
-                }
-                document.cookie = \"proxy-target=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-                document.cookie = \"proxy-zattoo-cdn=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-                window.location.href = '/';
-            });
-            document.body.prepend(btn);
-
-            document.cookie = \"uuid=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-            document.cookie = \"FAVORITES_ONBOARDING=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;\";
-        
-            if(document.head.innerHTML.includes(\"tagesanzeiger.ch\")){
-                //tagesanzeiger reload
-                const observer = new MutationObserver(function(mutations_list) {
-                    mutations_list.forEach(function(mutation) {
-                        mutation.addedNodes.forEach(function(added_node) {
-                            if(added_node.innerHTML.includes(\"(CSR)\")){
-                                location.reload();
-                            }
-                            console.log(added_node);
-                        });
-                    });
-                });
-                observer.observe(document.querySelector(\"#__next\"), { subtree: false, childList: true });
-        
-            }
-        }
-
-
-
-        </script>";
-        format!("{}{}{}\n{}\n{}\n", head_base, HTTPS_BASE_URL, base_char, style, script)
+        let script = io::read_to_string("ma-thesis/js/basescript.html").unwrap();
+        format!("{}{}{}\n{}\n", head_base, HTTPS_BASE_URL, base_char,  script)
     };
 }
 
@@ -284,7 +248,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
 pub fn check_auth_for_request(req: & Request) -> bool {
     if let Some(uuid) = &req.uuid {
         let domain = get_target_domain(req);
-        return domain.auth_user.contains_key(uuid)
+        return domain.auth_user.contains(uuid)
     } else {return false};
     
 }
@@ -636,6 +600,7 @@ pub fn get_random_cookie(req: & Request) -> String {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
+   // println!("Domain Debug: \n Cookie : {:?} \n origin:  {:?} \n authusers: {:?}", target_domain.cookies, target_domain.cookie_origin, target_domain.auth_user);
     let cookies = &target_domain.cookies;
     if cookies.len()>0 {
         let index = rand::thread_rng().gen_range(0, cookies.len());
@@ -646,8 +611,54 @@ pub fn get_random_cookie(req: & Request) -> String {
     //target_domain.cookies.choose(& mut thread_rng())
 }
 
+pub fn cookie_validator(){
+   // println!("[->] Entering Cookie Validation");
+    let map_ref = PROXY_URLS.lock().unwrap();
+    let mut map = map_ref.clone();
+    drop(map_ref);
+    //let mut remove: HashMap<String, Vec<u16>> = HashMap::new();
+    for (k,v) in map.iter_mut(){
+        if v.cookies.len() > 0 {
+            //println!("checking: {}", k);
+            let mut remove_indexes = Vec::new();
+            for (i, cookie) in v.cookies.iter().enumerate() {
+                //println!("Cookie {} = {}", i, cookie);
+                let valid = try_out_cookie_at_target(&v, &cookie);
+                if !valid {
+                    remove_indexes.push(i);
+                }
+                
+            }
+            remove_indexes.sort_by(|a,b| b.cmp(a)); // Reverse Order to remove them from vector safely...
+            //println!("Removing: {:?}", remove_indexes);
+            remove_invalid_cookies(k, &remove_indexes);
+        }
+    }
+    //drop(map);
+    //println!("[<-] Exiting Cookie Validation");
+
+}
+
+pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
+    let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(domain).unwrap();
+    for i in indexes{
+        let cookie = target_domain.cookies.remove(*i); // remove from cookie
+        let res = target_domain.cookie_origin.remove(&cookie);
+        match res {
+            Some(uuid) => {
+                target_domain.auth_user.remove(&uuid);
+            },
+            _ => {/* Acces already removed */}
+        }
+
+    }
+    drop(map);
+}
+
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
-    if try_out_cookie_at_target(req, &cookie) {
+    let target_domain = get_target_domain(&req);
+    if try_out_cookie_at_target(&target_domain, &cookie) {
         println!("[+] Cookie Validated, it will now be inserted!");
         insert_cookie_to_target(&req, cookie);
         true
@@ -657,9 +668,9 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     }
 }
 
-pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
-    let mut map = PROXY_URLS.lock().unwrap();
-    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
+pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> bool {
+    /*let mut map = PROXY_URLS.lock().unwrap();
+    let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();*/
     let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
     let status_code = response.status_code();
     match target_domain.login_check_answer.as_str() {
@@ -670,7 +681,7 @@ pub fn try_out_cookie_at_target(req: & Request, cookie: &String) -> bool {
         },
         "tagi" => {
             let body = String::from_utf8_lossy(&_body);
-            println!("Cookie used: {}", cookie);
+            //println!("Cookie used: {}", cookie);
             if body.contains("abo-button") {
                 println!("Login successfull");
             } else {
@@ -697,9 +708,12 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let cookie_decoded = cookie.clone().replace("+", " ");
     /*
     let parsed_cookie = Cookie::parse(cookie_decoded).unwrap();
-    target_domain.auth_user.insert(req.uuid.as_ref().unwrap().to_string(), parsed_cookie.value().to_string());
     */
-    let parsed_cookie = cookie_decoded;
+    let parsed_cookie = cookie_decoded.clone();
+    let uuid = req.uuid.as_ref().unwrap().to_string();
+    target_domain.auth_user.insert(uuid.clone());
+    target_domain.cookie_origin.insert(cookie_decoded, uuid);
+
     target_domain.cookies.push(parsed_cookie);
 
     //println!("Vector now {:?}",  target_domain);

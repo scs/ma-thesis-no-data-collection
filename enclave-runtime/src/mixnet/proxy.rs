@@ -28,6 +28,7 @@ use rand::{Rng};
 use std::time::{Duration};
 use time::OffsetDateTime;
 use itp_sgx_io as io;
+use serde_json::{Value};
 
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
@@ -164,7 +165,7 @@ lazy_static! {
     static ref HEADERS: Vec<String> = {vec![
         String::from("Accept"),
         String::from("Accept-Charset"),
-        String::from("Authorization"),
+        //String::from("Authorization"),
         //String::from("Accept-Encoding"),
         //String::from("Connection"),
         //String::from("Access-Control-Allow-Origin"),
@@ -671,23 +672,58 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
 pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> bool {
     /*let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();*/
-    let (response, _body) = send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+
+    let login_check_answer = target_domain.login_check_answer.as_str();
+    let (response, _body) = if login_check_answer == "tagi" {
+       send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::POST, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap()
+    } else {
+        send_https_request_all_paraemeter(&target_domain.login_check_uri, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap()
+    };
     let status_code = response.status_code();
-    match target_domain.login_check_answer.as_str() {
+    match login_check_answer {
         "302" => {
             if status_code.is_redirect() {
                 false
             } else {true}
         },
         "tagi" => {
-            let body = String::from_utf8_lossy(&_body);
-            //println!("Cookie used: {}", cookie);
+            let body = String::from_utf8(_body).unwrap(); // personal data
+            let json: Value = serde_json::from_str(body.as_str()).unwrap();
+            let identity = &json["identityToken"].as_str();
+            let bearer = format!("Bearer {}", &identity.unwrap());
+            //println!("Debug: {}", bearer);
+            let sec: Uri = "https://www.tagesanzeiger.ch/disco-api/v1/paywall/get-entitlements".parse().unwrap();
+            let (_res, answer) = send_https_request_all_paraemeter(
+                &sec, 443, Method::POST,
+                &String::new(), 
+                &vec![
+                    (String::from("Connection"), String::from("Keep-alive")),
+                    (String::from("Authorization"), bearer.to_string())
+                    ]
+                ).unwrap();
+            let bo = String::from_utf8(answer).unwrap();
+            let abo_json: Value = serde_json::from_str(bo.as_str()).unwrap();
+            println!("Debug token {}", abo_json["hasAbo"]);
+            /*
             if body.contains("abo-button") {
                 println!("Login successfull");
             } else {
                 println!("not good");
             }
             true
+           */
+          match abo_json["hasAbo"] {
+              Value::Bool(bo) => {bo},
+              _ => false
+          }
+          /*
+          println!("{:?}", &abo_json["hasAbo"].unwrap());
+            if abo_json["hasAbo"].as_str().unwrap() == "true" {
+                true
+            } else {
+                false
+            }
+            //abo_json["hasAbo"]*/
         },
         "403" => {
             if status_code.is_client_err() {

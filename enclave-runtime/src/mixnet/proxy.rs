@@ -397,6 +397,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         //String::from("400").as_bytes().to_vec()
     } else { // 500-599 Server Error
         println!("ERROR-{}: Requested Path: {}", status_code, req.path.unwrap());
+        println!("Debug body of 500 {}",  String::from_utf8(body_original.to_vec()).unwrap_or("error".to_string()));
         String::from("500").as_bytes().to_vec()
     };
     let status_line = format!("{} {} {}", version, status_code, reason);
@@ -690,7 +691,7 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
             let body = String::from_utf8(_body).unwrap(); // personal data
             let json: Value = serde_json::from_str(body.as_str()).unwrap();
             let identity = &json["identityToken"].as_str();
-            let bearer = format!("Bearer {}", &identity.unwrap());
+            let bearer = format!("Bearer {}", &identity.unwrap_or(""));
             //println!("Debug: {}", bearer);
             let sec: Uri = "https://www.tagesanzeiger.ch/disco-api/v1/paywall/get-entitlements".parse().unwrap();
             let (_res, answer) = send_https_request_all_paraemeter(

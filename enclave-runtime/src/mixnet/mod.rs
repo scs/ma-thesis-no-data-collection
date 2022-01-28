@@ -33,7 +33,7 @@ pub fn start_tls_server(){
     //test_http::start_tcp_listener();
     thread::spawn(|| {
         loop {
-            thread::sleep(Duration::from_secs(60));
+            thread::sleep(Duration::from_secs(15*60));
             proxy::cookie_validator();
         }
     });

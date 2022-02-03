@@ -30,6 +30,7 @@ use std::net::Shutdown;
 
 use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
 use crate::mixnet::router;
+use http_req::uri::Uri;
 
 #[derive(Debug, Clone)]
 pub struct Request<'a> {
@@ -37,6 +38,7 @@ pub struct Request<'a> {
     pub path: Option<&'a str>,
     pub version: Option<u8>,
     pub headers: HashMap<String, String>,
+    pub target_uri: Option<Uri>,
     pub body: HashMap<String, String>,
     pub target: Option<String>,
     pub zattoo_cdn: Option<String>,
@@ -373,6 +375,7 @@ impl Connection {
                         path: req.path,
                         version: req.version,
                         headers: HashMap::<String,String>::new(),
+                        target_uri: None,
                         body: HashMap::<String,String>::new(),
                         target: None,
                         zattoo_cdn: None,

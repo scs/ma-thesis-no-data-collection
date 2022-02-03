@@ -11,10 +11,10 @@ use std::{
         String,
     },
     vec::Vec,
-    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*,},
+    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*, BufWriter, Write},
     borrow::ToOwned,
     path::Path,
-    fs::File,
+    fs::{File, OpenOptions}
 
 };
 //use std::io::prelude::*;
@@ -29,7 +29,7 @@ use std::time::{Duration};
 use time::OffsetDateTime;
 use itp_sgx_io as io;
 use serde_json::{Value};
-
+use route_recognizer::Router;
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
 use urlencoding::decode;
@@ -60,7 +60,8 @@ pub struct Domain {
     pub regex_subdomains_relative: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
     pub auth_user: HashSet<String>,
-    pub cookie_origin: HashMap<String, String>
+    pub cookie_origin: HashMap<String, String>,
+    pub whitelist: Router<String>
  
 }
 
@@ -93,13 +94,37 @@ lazy_static! {
         for service in services {
             let mut split = service.split(" || ");
             //Attention: this must be adapted for each new column
-            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
+            let line =(split.next().unwrap(), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""), split.next().unwrap_or(""));
             let https_url = format!("https://{}", line.0);
             let base_regex = Regex::new(line.0).unwrap();
             let exended_base_regex = Regex::new(format!("(?:(?:ht|f)tp(?:s?)://|~/|/|//)?{}", line.0).as_str()).unwrap();
             let subdomains_regex = if line.3.eq("") {None} else { Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/)({}))", line.3).as_str()).unwrap())};
             let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\'|\\()//({})", line.3).as_str()).unwrap())};
             let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
+
+            println!(" ---------------Router Creation for {}-----------------", line.0.to_string());
+            //router creation
+            let mut r = Router::new();
+            if !line.5.eq("") {
+                let whitelist =  line.5.split("|");
+                for dom in whitelist {
+                    println!("Allow: {:?}", dom);
+                    r.add(dom, "Proxy".to_string());
+                }
+
+
+            }
+            if !line.6.eq("") {
+                let blacklist =  line.6.split("|");
+                for dom in blacklist {
+                    println!("Block: {:?}", dom);
+                    r.add(dom, "Block".to_string());
+
+                }
+
+
+            }
+
             m.insert(String::from(line.0), Domain{
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -112,6 +137,7 @@ lazy_static! {
                 regex_general_subdomains: all_subdomains_regex,
                 auth_user: HashSet::new(),
                 cookie_origin: HashMap::new(),
+                whitelist: r,
             });
         };
         Mutex::new(m)
@@ -225,7 +251,18 @@ Proxy Part
 ------------------------
 */
 pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
-    let target_uri = parse_target_uri(&req);
+    let target_uri = req.target_uri.as_ref().unwrap();
+    /*
+    // Get paths for Whitlist
+    let path = "debug/paths.txt";
+    let f = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(path)
+        .expect("unable to open file");
+    let mut f = BufWriter::new(f);
+    writeln!(f, "{}", target_uri.path().unwrap_or("/"));
+    */
     let headers = create_headers_to_forward(&req);
     //let (res, body) = send_https_request(https_url, &req).unwrap();
     let body = if req.inital_auth_req {
@@ -253,7 +290,7 @@ pub fn check_auth_for_request(req: & Request) -> bool {
     } else {return false};
     
 }
-
+/*
 pub fn parse_target_uri(req: & Request) -> Uri {
     let regex = Regex::new("proxy_sub=(.*)").unwrap();
     let path = req.path.unwrap();
@@ -291,7 +328,7 @@ pub fn create_https_url_from_target_and_route(req: & Request) -> String {
     https_url += path;
     https_url
 }
-
+*/
 
 pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)->IOResult<(String, Headers, Vec<u8>)>{
     let mut headers = Headers::new();

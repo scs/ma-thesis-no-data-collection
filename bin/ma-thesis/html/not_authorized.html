@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Not Authorized!</title>
+    <script type="text/javascript">
+      function setCookie(cname, cvalue, exhours) {
+          const d = new Date();
+          d.setTime(d.getTime() + (exhours*60*60*1000));
+          let expires = "expires="+ d.toUTCString();
+          document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/;SameSite=None;Secure";
+      }
+
+      function invalidateCookies(){
+        setCookie("proxy-target", "", -1);
+        setCookie("proxy-invalid-session", "", -1);
+      }
+    </script>
+  </head>
+  <body>
+    <h1>Not Authorized!</h1>
+    <p>Your login data or cookie was invalid</p>
+    <a href="/" onclick="invalidateCookies()">Back to home</a>
+  </body>
+</html>

@@ -30,6 +30,7 @@ use std::net::Shutdown;
 
 use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
 use crate::mixnet::router;
+use http_req::uri::Uri;
 
 #[derive(Debug, Clone)]
 pub struct Request<'a> {
@@ -37,9 +38,12 @@ pub struct Request<'a> {
     pub path: Option<&'a str>,
     pub version: Option<u8>,
     pub headers: HashMap<String, String>,
+    pub target_uri: Option<Uri>,
     pub body: HashMap<String, String>,
     pub target: Option<String>,
-    pub auth: bool,
+    pub zattoo_cdn: Option<String>,
+    pub uuid: Option<String>,
+    pub inital_auth_req: bool,
 }
 use regex::Regex;
 
@@ -58,9 +62,15 @@ use std::{
 use urlencoding::decode;
 //use httparse::*;
 
+lazy_static!{
+    static ref PROXY_TARGET_REGEX: Regex = Regex::new("proxy-target=([^;]*)").unwrap();
+    static ref PROXY_UUID_REGEX: Regex = Regex::new("proxy-uuid=([^;]*)").unwrap();
+    static ref PROXY_ZATTOO_CDN_REGEX: Regex = Regex::new("proxy-zattoo-cdn=([^;]*)").unwrap();
+}
+
 // Token for our listening socket.
 const LISTENER: mio::Token = mio::Token(0);
-
+//use async_std::task;
 //Router
 //static mut ROUTER: router::Router<()> = router::load_all_routes();
 
@@ -264,7 +274,6 @@ impl Connection {
     fn try_plain_read(&mut self) {
         // Read and process all available plaintext.
         let mut buf = Vec::new();
-        
         let rc = self.tls_session.read_to_end(&mut buf);
         if rc.is_err() {
             error!("plaintext read failed: {:?}", rc);
@@ -318,8 +327,15 @@ impl Connection {
                 self.tls_session.write_all(buf).unwrap();
             }
             ServerMode::Http => { // TODO: put in here behaviour after a Request
+                /*
+                let before_time = std::time::Instant::now();
+                println!{"Connection: {:?} starting req", self.token};
                 self.handle_request(buf);
-                //self.send_http_response_once();
+                println!{"Connection: {:?} finished req after {:#?}", self.token, before_time.elapsed()};
+
+                //self.send_http_response_once();*/
+
+                self.handle_request(buf);
             }
             ServerMode::Forward(_) => {
                 self.back.as_mut().unwrap().write_all(buf).unwrap();
@@ -335,55 +351,91 @@ impl Connection {
             for i in it {
                 //println!("{:?}", i);
                 let kv:Vec<&str> = i.split("=").collect();
-                let k = kv[0].to_string();
-                let v = String::from(decode(kv[1]).unwrap()); 
-                //println!("DEBUG: VALUE: {}", v);
-                if v!=String::from(""){
-                    body_to_fill.insert(k,v);
+                if kv.len() == 2 {
+                    let k = kv[0].to_string();
+                    let v = String::from(decode(kv[1]).unwrap()); 
+                    //println!("DEBUG: VALUE: {}", v);
+                    if v!=String::from(""){
+                        body_to_fill.insert(k,v);
+                    }
                 }
-               
             }
-            
         }
     }
 
     fn parse_request<'a>(&'a mut self, buf: &'a [u8])->Result<Request, String>{
         let mut headers = [httparse::EMPTY_HEADER; 64];
         let mut req = httparse::Request::new(&mut headers);
-        let res = req.parse(buf).unwrap();
-        if res.is_complete(){
-            let mut parsed_req = Request {
-                method: req.method,
-                path: req.path,
-                version: req.version,
-                headers: HashMap::<String,String>::new(),
-                body: HashMap::<String,String>::new(),
-                target: None,
-                auth: false
-            };
-            for i in 0..req.headers.len() { // Adding Headers to Hasmap
-                let h = req.headers[i];
-                let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
-                parsed_req.headers.insert(h.name.to_string(), value);
+        let res = req.parse(buf);
+        match res {
+            Ok(status)=> {
+                if status.is_complete(){
+                    let mut parsed_req = Request {
+                        method: req.method,
+                        path: req.path,
+                        version: req.version,
+                        headers: HashMap::<String,String>::new(),
+                        target_uri: None,
+                        body: HashMap::<String,String>::new(),
+                        target: None,
+                        zattoo_cdn: None,
+                        uuid: None,
+                        inital_auth_req: false
+                    };
+                    for i in 0..req.headers.len() { // Adding Headers to Hasmap
+                        let h = req.headers[i];
+                        let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
+                        parsed_req.headers.insert(h.name.to_string(), value);
+                    }
+                    //Debug:
+                    //println!("Debug valide-headers: {:?}", parsed_req.headers);
+                    /*
+                    if req.path.unwrap().contains("validate-session"){
+                        println!("Debug valide-headers: {:?}", parsed_req.headers);
+                        println!("Debug valide-method: {:?}", parsed_req.method);
+                        println!("Debug valide-path: {:?}", parsed_req.path);
+
+                    }*/
+                    if parsed_req.headers.contains_key("Cookie"){ // Getting Target adn UUID from Cookie
+                        let cookie = parsed_req.headers.get("Cookie").unwrap();
+                        let target = match PROXY_TARGET_REGEX.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.target = target;
+                        let uuid = match PROXY_UUID_REGEX.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.uuid = uuid;
+                        let zattoo_cdn = match PROXY_ZATTOO_CDN_REGEX.captures(cookie.as_str()) {
+                            Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
+                            _ => None,
+                        };
+                        parsed_req.zattoo_cdn = zattoo_cdn;
+                        //parsed_req.auth = cookie.contains("proxy-auth")
+                    }
+                    let method = parsed_req.method.unwrap();
+                    if method.eq("POST") | method.eq("PUT") | method.eq("PATCH"){
+                        self.create_request_body(&buf, status.unwrap(), &mut parsed_req.body);
+                    }
+                    //remove post and initial body then check if cookie is contained
+                    parsed_req.inital_auth_req = if parsed_req.body.contains_key("proxy_login"){
+                        parsed_req.method = Some("GET"); // cleanup
+                        parsed_req.body.remove("proxy_login");
+                        parsed_req.body.contains_key("cookie")
+                    } else {false};
+                
+                    Ok(parsed_req)
+                } else {
+                    Err(String::from("Request was incomplete"))
+                }
+            },
+            _ => {
+                Err(String::from("Couldn't parse the Request"))
             }
-            
-            if parsed_req.headers.contains_key("Cookie"){ // Getting Target from Cookie
-                let cookie = parsed_req.headers.get("Cookie").unwrap();
-                let cookie_re = Regex::new("proxy-target=([^;]*)").unwrap();
-                let target = match cookie_re.captures(cookie.as_str()) {
-                    Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
-                    _ => None,
-                };
-                parsed_req.target = target;
-                parsed_req.auth = cookie.contains("proxy-auth")
-            }
-            self.create_request_body(&buf, res.unwrap(), &mut parsed_req.body);
-            //set auth
-            parsed_req.auth = parsed_req.body.contains_key("username")&&parsed_req.body.contains_key("password")||parsed_req.body.contains_key("cookie");
-            Ok(parsed_req)
-        } else {
-            Err(String::from("Request was invalid"))
         }
+        //let res = req.parse(buf).unwrap();
     }
 
     fn handle_request(&mut self, buf: &[u8]){
@@ -400,7 +452,7 @@ impl Connection {
             },
             Err(m) => {
                 debug!("[Enclave-TLS-Server-Parsing]: {}", m);
-                router::not_found().unwrap() 
+                router::internal_server_error().unwrap() 
             } 
         };
         self.send_response(res);
@@ -571,7 +623,6 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
     'outer: loop {
         poll.poll(&mut events, None)
             .unwrap();
-
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
@@ -582,7 +633,9 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
                         break 'outer;
                     }
                 }
-                _ => tlsserv.conn_event(&mut poll, &event)
+                _ => {
+                    tlsserv.conn_event(&mut poll, &event);
+                }
             }
         }
     }

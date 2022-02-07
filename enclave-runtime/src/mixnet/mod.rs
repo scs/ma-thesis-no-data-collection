@@ -22,9 +22,21 @@ pub mod proxy;
 pub mod router;
 
 pub const BASE_URL: &str = "127.0.0.1:8443"; 
+pub const BASE_LOCALHOST_URL: &str = "localhost:8443"; 
+
 pub const HTTPS_BASE_URL: &str = "https://localhost:8443"; 
+use sgx_tstd as std;
+use std::thread;
+use std::time::{Duration};
 
 pub fn start_tls_server(){
     //test_http::start_tcp_listener();
+    thread::spawn(|| {
+        loop {
+            thread::sleep(Duration::from_secs(15*60));
+            proxy::cookie_validator();
+        }
+    });
     tls_server::run_server(128);
+
 }

@@ -44,6 +44,7 @@ pub struct Request<'a> {
     pub zattoo_cdn: Option<String>,
     pub uuid: Option<String>,
     pub inital_auth_req: bool,
+    pub regexes: Vec<Regex>
 }
 use regex::Regex;
 
@@ -380,7 +381,8 @@ impl Connection {
                         target: None,
                         zattoo_cdn: None,
                         uuid: None,
-                        inital_auth_req: false
+                        inital_auth_req: false,
+                        regexes: Vec::new()
                     };
                     for i in 0..req.headers.len() { // Adding Headers to Hasmap
                         let h = req.headers[i];
@@ -596,7 +598,7 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 
 
 #[no_mangle]
-pub extern "C" fn run_server(max_conn: uint8_t) {
+pub extern "C" fn run_server(_max_conn: uint8_t) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
     //let cert = "end.fullchain";
     let cert = "localhost.crt"; // TODO: add it to the browser

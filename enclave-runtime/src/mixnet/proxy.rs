@@ -11,10 +11,10 @@ use std::{
         String,
     },
     vec::Vec,
-    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*, BufWriter, Write},
+    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*},// BufWriter, Write},
     borrow::ToOwned,
     path::Path,
-    fs::{File, OpenOptions}
+    fs::{File} //, //OpenOptions}
 
 };
 //use std::io::prelude::*;
@@ -32,7 +32,7 @@ use serde_json::{Value};
 use route_recognizer::Router;
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
-use urlencoding::decode;
+//use urlencoding::decode;
 //use core::borrow::{BorrowMut, Borrow};
 //use std::sync::Arc;
 const HEAD_503: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
@@ -49,6 +49,7 @@ const DUR_FIVE_SEC: Option<Duration> = Some(Duration::from_millis(2000));
 #[derive(Clone,Debug)]
 pub struct Domain {
 //    pub struct Domain <'a> {
+    pub name: String,
     pub uri: Uri, 
     pub login_check_uri: Uri,
     pub login_check_answer: String,
@@ -126,6 +127,7 @@ lazy_static! {
             }
 
             m.insert(String::from(line.0), Domain{
+                name: String::from(line.0),
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
                 login_check_answer: String::from(line.2),
@@ -221,7 +223,7 @@ lazy_static! {
     ]};
 }
 
-fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
+fn create_headers_to_forward_and_regexes<'a>(req: &'a Request) -> (Vec::<(String, String)>, Vec<Regex>){
     let mut forwarded_headers: Vec::<(String, String)> = DEFAULT_HEADERS.clone();
     for header in HEADERS.iter() {
         match req.headers.get(header) {
@@ -237,12 +239,12 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
             _ => {}
         }
     };*/
-    let cookie = get_random_cookie(&req);
+    let (cookie, regexes) = get_random_cookie_and_regexes(req);
     //println!("using cookie: {}", cookie);
-    if !cookie.eq(&String::from("")){
+    if !cookie.eq(&String::from("")){ // if valid cookie is found add it to header
         forwarded_headers.push((String::from("Cookie"),cookie));
     }
-    forwarded_headers
+    (forwarded_headers, regexes)
 }
 
 /*
@@ -250,7 +252,7 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
 Proxy Part 
 ------------------------
 */
-pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
+pub fn forward_request_and_return_response(mut req: Request) -> IOResult<Vec<u8>> {
     let target_uri = req.target_uri.as_ref().unwrap();
     /*
     // Get paths for Whitlist
@@ -263,7 +265,8 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
     let mut f = BufWriter::new(f);
     writeln!(f, "{}", target_uri.path().unwrap_or("/"));
     */
-    let headers = create_headers_to_forward(&req);
+    let (headers, regexes) = create_headers_to_forward_and_regexes(& req);
+    req.regexes = regexes;
     //let (res, body) = send_https_request(https_url, &req).unwrap();
     let body = if req.inital_auth_req {
         String::new()
@@ -279,7 +282,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
         &headers
     ).unwrap();
 
-    let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
+    let (status_line, headers, body) = handle_response(res, &body, &req).unwrap();
     prepare_response(status_line, headers, body)
 }
 
@@ -340,6 +343,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let mut body = String::new().as_bytes().to_vec();
     let path = req.path.unwrap();
     let target = req.target.as_ref().unwrap();
+
     if status_code.eq(&StatusCode::new(204)) && req.method.unwrap().eq("OPTIONS"){
         headers.insert("Access-Control-Allow-Origin", "https://localhost:8443/");
         //headers.insert("Date", "Mon, 16 Jan 2022 11:23:04 GMT");
@@ -377,8 +381,13 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
-
+                    
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
+                    for regex in req.regexes.iter(){
+                        println!("trying regex: {}", regex);
+                        clean = regex_replace_all_wrapper(regex, &clean, &"---SANITIZED---".to_string());
+                    }
+                    
                     clean = if content_type.contains("script") && target.contains("tagesanzeiger"){
                         let int_re = Regex::new("http(?:s?)://(?:www.)?").unwrap();
 
@@ -645,7 +654,7 @@ Cookie Magic
 ------------------------
 */
 
-pub fn get_random_cookie(req: & Request) -> String {
+pub fn get_random_cookie_and_regexes(req: & Request) -> (String, Vec<Regex>) {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
@@ -653,8 +662,11 @@ pub fn get_random_cookie(req: & Request) -> String {
     let cookies = &target_domain.cookies;
     if cookies.len()>0 {
         let index = rand::thread_rng().gen_range(0, cookies.len());
-        cookies[index].to_string()
-    } else {String::from("")}
+        let cookie = cookies[index].to_string();
+        // add logic to attach regexes
+        let regexes_vec = &target_domain.cookie_origin.get(&cookie).unwrap().1;
+        (cookie, regexes_vec.to_vec())
+    } else {(String::from(""), Vec::new())}
 
     //String::from("s: &str")
     //target_domain.cookies.choose(& mut thread_rng())
@@ -672,7 +684,7 @@ pub fn cookie_validator(){
             let mut remove_indexes = Vec::new();
             for (i, cookie) in v.cookies.iter().enumerate() {
                 //println!("Cookie {} = {}", i, cookie);
-                let valid = try_out_cookie_at_target(&v, &cookie, &Vec::new());
+                let valid = try_out_cookie_at_target(&v, &cookie, & mut Vec::new(), false);
                 if !valid {
                     remove_indexes.push(i);
                 }
@@ -708,8 +720,8 @@ pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     let target_domain = get_target_domain(&req);
-    let regexes: Vec<Regex> = Vec::new(); // need to be filled up
-    if try_out_cookie_at_target(&target_domain, &cookie, &regexes) {
+    let mut regexes: Vec<Regex> = Vec::new(); // need to be filled up
+    if try_out_cookie_at_target(&target_domain, &cookie, & mut regexes, true) {
         println!("[+] Cookie Validated, it will now be inserted!");
         insert_cookie_to_target(&req, cookie, regexes);
         true
@@ -719,7 +731,7 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     }
 }
 
-pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regexes: &Vec<Regex>) -> bool {
+pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regexes: & mut Vec<Regex>, sanitizer: bool) -> bool {
     /*let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();*/
 
@@ -770,13 +782,37 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regex
         "403" => {
             if status_code.is_client_err() {
                 false
-            } else {true}
+            } else {
+                if sanitizer {
+                    create_sanitizer_regex(target_domain, cookie, regexes);
+                }
+                true}
         },
         _ => {
             true}
     }
 }
 
+pub fn create_sanitizer_regex(target_domain: & Domain, cookie: &String, regexes: & mut Vec<Regex>){
+    match target_domain.name.as_str() {
+        "test.benelli.dev" => {},
+        "wwww.tagesanzeiger.ch" => {},
+        "www.nzz.ch" => {},
+        "zattoo.com" => {
+            let addr: Uri = "https://zattoo.com/zapi/v3/session".parse().unwrap();
+            let (_response,body) = send_https_request_all_paraemeter(&addr, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+            let body = String::from_utf8(body).unwrap(); // personal data
+            let json: Value = serde_json::from_str(body.as_str()).unwrap();
+            //let identity = &json["account"].as_str();
+            //let bearer = format!("Bearer {}", &identity.unwrap_or(""));
+            let login = String::from((json["account"]["name"]).as_str().unwrap());
+            let regex = Regex::new(&login).unwrap();
+            regexes.push(regex);
+            println!("Response zattoo {}", login);
+        },
+        _ => {}
+    };
+}
 
 pub fn insert_cookie_to_target(req: & Request, cookie: String, regexes: Vec<Regex>){
     let mut map = PROXY_URLS.lock().unwrap();

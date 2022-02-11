@@ -617,8 +617,8 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
         .unwrap();
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-
-    let mut events = mio::Events::with_capacity(256);
+    let max_conn2 = 1024;
+    let mut events = mio::Events::with_capacity(2048);
     println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
         poll.poll(&mut events, None)
@@ -626,7 +626,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
-                    if tlsserv.connections.len() as u8 == max_conn {
+                    if tlsserv.connections.len() as u16 == max_conn2 {
                         continue;
                     }
                     if !tlsserv.accept(&mut poll) {

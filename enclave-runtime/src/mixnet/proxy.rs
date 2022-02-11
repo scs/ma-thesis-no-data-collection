@@ -102,13 +102,13 @@ lazy_static! {
             let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\'|\\()//({})", line.3).as_str()).unwrap())};
             let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
 
-            println!(" ---------------Router Creation for {}-----------------", line.0.to_string());
+           // println!(" ---------------Router Creation for {}-----------------", line.0.to_string());
             //router creation
             let mut r = Router::new();
             if !line.5.eq("") {
                 let whitelist =  line.5.split("|");
                 for dom in whitelist {
-                    println!("Allow: {:?}", dom);
+                    //println!("Allow: {:?}", dom);
                     r.add(dom, "Proxy".to_string());
                 }
 
@@ -117,7 +117,7 @@ lazy_static! {
             if !line.6.eq("") {
                 let blacklist =  line.6.split("|");
                 for dom in blacklist {
-                    println!("Block: {:?}", dom);
+                    //println!("Block: {:?}", dom);
                     r.add(dom, "Block".to_string());
 
                 }
@@ -472,7 +472,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     let mut request = RequestBuilder::new(&addr)
         .method(method).to_owned();
 
-    // Fill in Headers
+    // Fill in Headers¨
+    
     for header in headers {
         request.header(&header.0, &header.1);
     };
@@ -486,13 +487,13 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         let response = Response::from_head(HEAD).unwrap();
         Ok((response, writer))
 
-    } else if addr.host().unwrap().contains("localhost"){
+    } else if addr.host().unwrap().contains("localhost") && addr.port().unwrap() !=8444 {
         println!("Early returning call to localhost");
+        //println!("Debug addr: {:?}", addr);
         Ok((return_503(), writer))
     }
     else {
             let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-
             // get TLS Session
             let mut map = PROXY_TLS_CONN.lock().unwrap();
             let host = String::from(addr.host().unwrap());
@@ -515,7 +516,7 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
         //let path = addr.path().unwrap_or("");
-       // if path.contains("content") {println!("Debug request {:?}", request);}
+    //   if addr.host().unwrap().contains("localhost"){println!("Debug request {:?}", request);}
         let request_backup = request.clone();
         let temp = request.send(&mut stream, &mut writer);
         drop(map);
@@ -555,6 +556,7 @@ pub fn error_handling_request_builder(handle: Result<Response, ReqError>, reques
                         _ => {
                             println!("Request IOError (default 503), Kind: {:?}, ", error.kind());
                             //let response = return_503();
+                            println!("Debug body: {:?}", writer);
                             Ok((default_503, writer))
                         }
                     }
@@ -624,9 +626,17 @@ pub fn create_tcp_stream(conn_addr: &String, addr: &Uri) -> Conn<std::net::TcpSt
     stream.set_read_timeout(DUR_FIVE_SEC).expect("set_read_timeout call failed");
     stream.set_write_timeout(DUR_FIVE_SEC).expect("set_write_timeout call failed");
     //Open secure connection over TlsStream, because of `addr` (https)
-    tls::Config::default()
+    if conn_addr.contains("localhost:8444"){
+        let path = Path::new("ma-thesis/end.fullchain");
+        tls::Config::default()
+        .add_root_cert_file_pem(path).unwrap() 
         .connect(addr.host().unwrap_or(""), stream)
         .unwrap()
+    } else {
+        tls::Config::default()
+        .connect(addr.host().unwrap_or(""), stream)
+        .unwrap()
+    }
 }
 
 /*

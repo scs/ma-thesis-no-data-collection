@@ -44,6 +44,7 @@ pub struct Request<'a> {
     pub zattoo_cdn: Option<String>,
     pub uuid: Option<String>,
     pub inital_auth_req: bool,
+    pub regexes: Vec<Regex>
 }
 use regex::Regex;
 
@@ -54,7 +55,6 @@ extern crate sgx_types;
 
 use rustls::{Session, NoClientAuth};
 use mio::net::{TcpListener, TcpStream};
-use sgx_types::uint8_t;
 use codec::{alloc::string::String};
 use std::{
 	string::ToString,
@@ -380,7 +380,8 @@ impl Connection {
                         target: None,
                         zattoo_cdn: None,
                         uuid: None,
-                        inital_auth_req: false
+                        inital_auth_req: false,
+                        regexes: Vec::new()
                     };
                     for i in 0..req.headers.len() { // Adding Headers to Hasmap
                         let h = req.headers[i];
@@ -595,8 +596,8 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 }
 
 
-#[no_mangle]
-pub extern "C" fn run_server(max_conn: uint8_t) {
+
+pub fn run_server(max_conn: u16) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
     //let cert = "end.fullchain";
     let cert = "localhost.crt"; // TODO: add it to the browser
@@ -617,8 +618,7 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
         .unwrap();
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-
-    let mut events = mio::Events::with_capacity(256);
+    let mut events = mio::Events::with_capacity(2048);
     println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
         poll.poll(&mut events, None)
@@ -626,7 +626,8 @@ pub extern "C" fn run_server(max_conn: uint8_t) {
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
-                    if tlsserv.connections.len() as u8 == max_conn {
+                    if tlsserv.connections.len() as u16 == max_conn {
+                        println!("Capacity max...");
                         continue;
                     }
                     if !tlsserv.accept(&mut poll) {

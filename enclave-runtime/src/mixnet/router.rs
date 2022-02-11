@@ -208,7 +208,7 @@ pub fn proxy(mut request: ParsedRequest)->IOResult<Vec<u8>>{
 
             
             match m.handler().as_str() {
-                "Proxy" => proxy::forward_request_and_return_response(&request),
+                "Proxy" => proxy::forward_request_and_return_response(request),
                 "Block" => {println!("Blocking Path: {}, {}", m.handler().as_str(), path);
                             forbidden()},
                 _ => {println!("no handler defined for:  {}", path);
@@ -232,7 +232,7 @@ pub fn not_authorized()->IOResult<Vec<u8>>{
 
 pub fn forbidden()->IOResult<Vec<u8>>{
     let contents = get_file_contents("whitelist").unwrap();
-    let mut headers = Headers::new();
+    let headers = Headers::new();
     prepare_response(STATUS_LINE_FORBIDDEN, headers, contents)
 }
 

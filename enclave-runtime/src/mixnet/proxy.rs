@@ -11,10 +11,10 @@ use std::{
         String,
     },
     vec::Vec,
-    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*, BufWriter, Write},
+    io::{Result as IOResult, Error, ErrorKind, BufReader, prelude::*},// BufWriter, Write},
     borrow::ToOwned,
     path::Path,
-    fs::{File, OpenOptions}
+    fs::{File} //, //OpenOptions}
 
 };
 //use std::io::prelude::*;
@@ -32,7 +32,7 @@ use serde_json::{Value};
 use route_recognizer::Router;
 //use chrono::prelude::*;
 //use std::sync::atomic::{AtomicU8, Ordering*/};
-use urlencoding::decode;
+//use urlencoding::decode;
 //use core::borrow::{BorrowMut, Borrow};
 //use std::sync::Arc;
 const HEAD_503: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
@@ -49,6 +49,7 @@ const DUR_FIVE_SEC: Option<Duration> = Some(Duration::from_millis(2000));
 #[derive(Clone,Debug)]
 pub struct Domain {
 //    pub struct Domain <'a> {
+    pub name: String,
     pub uri: Uri, 
     pub login_check_uri: Uri,
     pub login_check_answer: String,
@@ -60,7 +61,7 @@ pub struct Domain {
     pub regex_subdomains_relative: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
     pub auth_user: HashSet<String>,
-    pub cookie_origin: HashMap<String, String>,
+    pub cookie_origin: HashMap<String, (String, Vec<Regex>)>,
     pub whitelist: Router<String>
  
 }
@@ -102,13 +103,13 @@ lazy_static! {
             let subdomains_regex_relative = if line.3.eq("") {None} else { Some(Regex::new(format!("(\"|\'|\\()//({})", line.3).as_str()).unwrap())};
             let all_subdomains_regex =  if line.4.eq("") {None} else {Some(Regex::new(format!("((?:(?:ht|f)tp(?:s?)://|~/|/|//)?([^.]+[.])*({}))", line.4).as_str()).unwrap())};
 
-            println!(" ---------------Router Creation for {}-----------------", line.0.to_string());
+           // println!(" ---------------Router Creation for {}-----------------", line.0.to_string());
             //router creation
             let mut r = Router::new();
             if !line.5.eq("") {
                 let whitelist =  line.5.split("|");
                 for dom in whitelist {
-                    println!("Allow: {:?}", dom);
+                    //println!("Allow: {:?}", dom);
                     r.add(dom, "Proxy".to_string());
                 }
 
@@ -117,7 +118,7 @@ lazy_static! {
             if !line.6.eq("") {
                 let blacklist =  line.6.split("|");
                 for dom in blacklist {
-                    println!("Block: {:?}", dom);
+                    //println!("Block: {:?}", dom);
                     r.add(dom, "Block".to_string());
 
                 }
@@ -126,6 +127,7 @@ lazy_static! {
             }
 
             m.insert(String::from(line.0), Domain{
+                name: String::from(line.0),
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
                 login_check_answer: String::from(line.2),
@@ -221,7 +223,7 @@ lazy_static! {
     ]};
 }
 
-fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
+fn create_headers_to_forward_and_regexes<'a>(req: &'a Request) -> (Vec::<(String, String)>, Vec<Regex>){
     let mut forwarded_headers: Vec::<(String, String)> = DEFAULT_HEADERS.clone();
     for header in HEADERS.iter() {
         match req.headers.get(header) {
@@ -237,12 +239,12 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
             _ => {}
         }
     };*/
-    let cookie = get_random_cookie(&req);
+    let (cookie, regexes) = get_random_cookie_and_regexes(req);
     //println!("using cookie: {}", cookie);
-    if !cookie.eq(&String::from("")){
+    if !cookie.eq(&String::from("")){ // if valid cookie is found add it to header
         forwarded_headers.push((String::from("Cookie"),cookie));
     }
-    forwarded_headers
+    (forwarded_headers, regexes)
 }
 
 /*
@@ -250,7 +252,7 @@ fn create_headers_to_forward<'a>(req: &'a  Request) -> Vec::<(String, String)>{
 Proxy Part 
 ------------------------
 */
-pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> {
+pub fn forward_request_and_return_response(mut req: Request) -> IOResult<Vec<u8>> {
     let target_uri = req.target_uri.as_ref().unwrap();
     /*
     // Get paths for Whitlist
@@ -263,7 +265,8 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
     let mut f = BufWriter::new(f);
     writeln!(f, "{}", target_uri.path().unwrap_or("/"));
     */
-    let headers = create_headers_to_forward(&req);
+    let (headers, regexes) = create_headers_to_forward_and_regexes(& req);
+    req.regexes = regexes;
     //let (res, body) = send_https_request(https_url, &req).unwrap();
     let body = if req.inital_auth_req {
         String::new()
@@ -279,7 +282,7 @@ pub fn forward_request_and_return_response(req: & Request) -> IOResult<Vec<u8>> 
         &headers
     ).unwrap();
 
-    let (status_line, headers, body) = handle_response(res, &body, req).unwrap();
+    let (status_line, headers, body) = handle_response(res, &body, &req).unwrap();
     prepare_response(status_line, headers, body)
 }
 
@@ -340,6 +343,7 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
     let mut body = String::new().as_bytes().to_vec();
     let path = req.path.unwrap();
     let target = req.target.as_ref().unwrap();
+
     if status_code.eq(&StatusCode::new(204)) && req.method.unwrap().eq("OPTIONS"){
         headers.insert("Access-Control-Allow-Origin", "https://localhost:8443/");
         //headers.insert("Date", "Mon, 16 Jan 2022 11:23:04 GMT");
@@ -377,8 +381,18 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
         if content_type.contains("text") || content_type.contains("application") && !content_type.contains("octet-stream") {
             match String::from_utf8(body_original.to_vec()) {
                 Ok(body_string) => {
-
+                    
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
+                    for regex in req.regexes.iter(){
+                        //println!("trying regex: {}", regex);
+                        if target.contains("nzz"){
+                            clean = regex_replace_all_wrapper(regex, &clean, &"\"---SANITIZED---\"".to_string());
+
+                        } else {
+                            clean = regex_replace_all_wrapper(regex, &clean, &"---SANITIZED---".to_string());
+                        }
+                    }
+                    
                     clean = if content_type.contains("script") && target.contains("tagesanzeiger"){
                         let int_re = Regex::new("http(?:s?)://(?:www.)?").unwrap();
 
@@ -472,7 +486,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     let mut request = RequestBuilder::new(&addr)
         .method(method).to_owned();
 
-    // Fill in Headers
+    // Fill in Headers¨
+    
     for header in headers {
         request.header(&header.0, &header.1);
     };
@@ -486,13 +501,13 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         let response = Response::from_head(HEAD).unwrap();
         Ok((response, writer))
 
-    } else if addr.host().unwrap().contains("localhost"){
+    } else if addr.host().unwrap().contains("localhost") && addr.port().unwrap() !=8444 {
         println!("Early returning call to localhost");
+        //println!("Debug addr: {:?}", addr);
         Ok((return_503(), writer))
     }
     else {
             let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-
             // get TLS Session
             let mut map = PROXY_TLS_CONN.lock().unwrap();
             let host = String::from(addr.host().unwrap());
@@ -515,7 +530,7 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
         //let path = addr.path().unwrap_or("");
-       // if path.contains("content") {println!("Debug request {:?}", request);}
+    //   if addr.host().unwrap().contains("localhost"){println!("Debug request {:?}", request);}
         let request_backup = request.clone();
         let temp = request.send(&mut stream, &mut writer);
         drop(map);
@@ -555,6 +570,7 @@ pub fn error_handling_request_builder(handle: Result<Response, ReqError>, reques
                         _ => {
                             println!("Request IOError (default 503), Kind: {:?}, ", error.kind());
                             //let response = return_503();
+                            println!("Debug body: {:?}", writer);
                             Ok((default_503, writer))
                         }
                     }
@@ -624,9 +640,17 @@ pub fn create_tcp_stream(conn_addr: &String, addr: &Uri) -> Conn<std::net::TcpSt
     stream.set_read_timeout(DUR_FIVE_SEC).expect("set_read_timeout call failed");
     stream.set_write_timeout(DUR_FIVE_SEC).expect("set_write_timeout call failed");
     //Open secure connection over TlsStream, because of `addr` (https)
-    tls::Config::default()
+    if conn_addr.contains("localhost:8444"){
+        let path = Path::new("ma-thesis/end.fullchain");
+        tls::Config::default()
+        .add_root_cert_file_pem(path).unwrap() 
         .connect(addr.host().unwrap_or(""), stream)
         .unwrap()
+    } else {
+        tls::Config::default()
+        .connect(addr.host().unwrap_or(""), stream)
+        .unwrap()
+    }
 }
 
 /*
@@ -635,7 +659,7 @@ Cookie Magic
 ------------------------
 */
 
-pub fn get_random_cookie(req: & Request) -> String {
+pub fn get_random_cookie_and_regexes(req: & Request) -> (String, Vec<Regex>) {
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
@@ -643,8 +667,11 @@ pub fn get_random_cookie(req: & Request) -> String {
     let cookies = &target_domain.cookies;
     if cookies.len()>0 {
         let index = rand::thread_rng().gen_range(0, cookies.len());
-        cookies[index].to_string()
-    } else {String::from("")}
+        let cookie = cookies[index].to_string();
+        // add logic to attach regexes
+        let regexes_vec = &target_domain.cookie_origin.get(&cookie).unwrap().1;
+        (cookie, regexes_vec.to_vec())
+    } else {(String::from(""), Vec::new())}
 
     //String::from("s: &str")
     //target_domain.cookies.choose(& mut thread_rng())
@@ -662,7 +689,7 @@ pub fn cookie_validator(){
             let mut remove_indexes = Vec::new();
             for (i, cookie) in v.cookies.iter().enumerate() {
                 //println!("Cookie {} = {}", i, cookie);
-                let valid = try_out_cookie_at_target(&v, &cookie);
+                let valid = try_out_cookie_at_target(&v, &cookie, & mut Vec::new(), false);
                 if !valid {
                     remove_indexes.push(i);
                 }
@@ -685,8 +712,9 @@ pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
         let cookie = target_domain.cookies.remove(*i); // remove from cookie
         let res = target_domain.cookie_origin.remove(&cookie);
         match res {
-            Some(uuid) => {
-                target_domain.auth_user.remove(&uuid);
+            Some(tuple) => {
+                // tuple = (uuid, Regexes)
+                target_domain.auth_user.remove(&tuple.0);
             },
             _ => {/* Acces already removed */}
         }
@@ -697,9 +725,10 @@ pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     let target_domain = get_target_domain(&req);
-    if try_out_cookie_at_target(&target_domain, &cookie) {
+    let mut regexes: Vec<Regex> = Vec::new(); // need to be filled up
+    if try_out_cookie_at_target(&target_domain, &cookie, & mut regexes, true) {
         println!("[+] Cookie Validated, it will now be inserted!");
-        insert_cookie_to_target(&req, cookie);
+        insert_cookie_to_target(&req, cookie, regexes);
         true
     } else {
         println!("[xxx] Cookie Validation failed");
@@ -707,7 +736,7 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     }
 }
 
-pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> bool {
+pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regexes: & mut Vec<Regex>, sanitizer: bool) -> bool {
     /*let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();*/
 
@@ -722,13 +751,20 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
         "302" => {
             if status_code.is_redirect() {
                 false
-            } else {true}
+            } else {
+                if sanitizer {
+                    create_sanitizer_regex(target_domain, cookie, regexes);
+                }
+                true
+            }
+
         },
         "tagi" => {
             let body = String::from_utf8(_body).unwrap(); // personal data
             let json: Value = serde_json::from_str(body.as_str()).unwrap();
             let identity = &json["identityToken"].as_str();
             let bearer = format!("Bearer {}", &identity.unwrap_or(""));
+
             //println!("Debug: {}", bearer);
             let sec: Uri = "https://www.tagesanzeiger.ch/disco-api/v1/paywall/get-entitlements".parse().unwrap();
             let (_res, answer) = send_https_request_all_paraemeter(
@@ -750,7 +786,22 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
             true
            */
           match abo_json["hasAbo"] {
-              Value::Bool(bo) => {bo},
+              Value::Bool(bo) => {
+                if sanitizer{
+                    regexes.push(Regex::new(&String::from((json["email"]).as_str().unwrap_or(""))).unwrap());
+                    let firstname = (json["firstname"]).as_str().unwrap_or("");
+                    let lastname = (json["lastname"]).as_str().unwrap_or("");
+                    //println!("Firstname: {}, lastname: {}", firstname, lastname);
+                    
+                    if firstname != "" {
+                        regexes.push(Regex::new(&String::from(firstname)).unwrap());
+                    }
+                    if lastname != "" {
+                        regexes.push(Regex::new(&String::from(lastname)).unwrap());
+                    }
+    
+                }
+                  bo},
               _ => false
           }
 
@@ -758,15 +809,59 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
         "403" => {
             if status_code.is_client_err() {
                 false
-            } else {true}
+            } else {
+                if sanitizer {
+                    create_sanitizer_regex(target_domain, cookie, regexes);
+                }
+                true}
         },
         _ => {
             true}
     }
 }
 
+pub fn create_sanitizer_regex(target_domain: & Domain, cookie: &String, regexes: & mut Vec<Regex>){
+    match target_domain.name.as_str() {
+        "test.benelli.dev" => {},
+        "www.nzz.ch" => {
+            let addr: Uri = "https://www.nzz.ch".parse().unwrap();
+            let (_response,body) = send_https_request_all_paraemeter(&addr, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+            let body = String::from_utf8(body).unwrap();
+            let userinforegex = Regex::new("window.nzzUserInfo = ([^;]*)").unwrap();
+            let data = userinforegex.captures(&body).unwrap();
+            let json: Value = serde_json::from_str(data.get(1).unwrap().as_str()).unwrap();
+            let firstname = (json["first_name"]).as_str().unwrap();
+            let lastname = (json["last_name"]).as_str().unwrap();
+            let _user_id = (json["user_id"]).as_str().unwrap();
+            let _session_id = (json["session_id"]).as_str().unwrap();
+            let escapedfirstname = format!("\"{}\"", firstname);      
+            let escapedlastname = format!("\"{}\"", lastname);            
+      
+            if escapedfirstname != "" {
+                regexes.push(Regex::new(&String::from(escapedfirstname)).unwrap());
+            }
+            if escapedlastname != "" {
+                regexes.push(Regex::new(&String::from(escapedlastname)).unwrap());
+            }
+            //println!("regex: {}", &data[1]);
+        },
+        "zattoo.com" => {
+            let addr: Uri = "https://zattoo.com/zapi/v3/session".parse().unwrap();
+            let (_response,body) = send_https_request_all_paraemeter(&addr, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+            let body = String::from_utf8(body).unwrap(); // personal data
+            let json: Value = serde_json::from_str(body.as_str()).unwrap();
+            //let identity = &json["account"].as_str();
+            //let bearer = format!("Bearer {}", &identity.unwrap_or(""));
+            let login = String::from((json["account"]["name"]).as_str().unwrap());
+            let regex = Regex::new(&login).unwrap();
+            regexes.push(regex);
+            //println!("Response zattoo {}", login);
+        },
+        _ => {}
+    };
+}
 
-pub fn insert_cookie_to_target(req: & Request, cookie: String){
+pub fn insert_cookie_to_target(req: & Request, cookie: String, regexes: Vec<Regex>){
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
@@ -778,7 +873,7 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let parsed_cookie = cookie_decoded.clone();
     let uuid = req.uuid.as_ref().unwrap().to_string();
     target_domain.auth_user.insert(uuid.clone());
-    target_domain.cookie_origin.insert(cookie_decoded, uuid);
+    target_domain.cookie_origin.insert(cookie_decoded, (uuid, regexes));
 
     target_domain.cookies.push(parsed_cookie);
 

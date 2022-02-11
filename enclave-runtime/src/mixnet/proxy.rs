@@ -384,8 +384,13 @@ pub fn handle_response(res: Response, body_original: & Vec<u8>, req: & Request)-
                     
                     let mut clean = clean_urls(&body_string, &req, &BASE_LOCALHOST_URL.to_string()).unwrap(); // URL changement to LOCALHOST
                     for regex in req.regexes.iter(){
-                        println!("trying regex: {}", regex);
-                        clean = regex_replace_all_wrapper(regex, &clean, &"---SANITIZED---".to_string());
+                        //println!("trying regex: {}", regex);
+                        if target.contains("nzz"){
+                            clean = regex_replace_all_wrapper(regex, &clean, &"\"---SANITIZED---\"".to_string());
+
+                        } else {
+                            clean = regex_replace_all_wrapper(regex, &clean, &"---SANITIZED---".to_string());
+                        }
                     }
                     
                     clean = if content_type.contains("script") && target.contains("tagesanzeiger"){
@@ -746,13 +751,20 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regex
         "302" => {
             if status_code.is_redirect() {
                 false
-            } else {true}
+            } else {
+                if sanitizer {
+                    create_sanitizer_regex(target_domain, cookie, regexes);
+                }
+                true
+            }
+
         },
         "tagi" => {
             let body = String::from_utf8(_body).unwrap(); // personal data
             let json: Value = serde_json::from_str(body.as_str()).unwrap();
             let identity = &json["identityToken"].as_str();
             let bearer = format!("Bearer {}", &identity.unwrap_or(""));
+
             //println!("Debug: {}", bearer);
             let sec: Uri = "https://www.tagesanzeiger.ch/disco-api/v1/paywall/get-entitlements".parse().unwrap();
             let (_res, answer) = send_https_request_all_paraemeter(
@@ -774,7 +786,22 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regex
             true
            */
           match abo_json["hasAbo"] {
-              Value::Bool(bo) => {bo},
+              Value::Bool(bo) => {
+                if sanitizer{
+                    regexes.push(Regex::new(&String::from((json["email"]).as_str().unwrap_or(""))).unwrap());
+                    let firstname = (json["firstname"]).as_str().unwrap_or("");
+                    let lastname = (json["lastname"]).as_str().unwrap_or("");
+                    //println!("Firstname: {}, lastname: {}", firstname, lastname);
+                    
+                    if firstname != "" {
+                        regexes.push(Regex::new(&String::from(firstname)).unwrap());
+                    }
+                    if lastname != "" {
+                        regexes.push(Regex::new(&String::from(lastname)).unwrap());
+                    }
+    
+                }
+                  bo},
               _ => false
           }
 
@@ -796,8 +823,28 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regex
 pub fn create_sanitizer_regex(target_domain: & Domain, cookie: &String, regexes: & mut Vec<Regex>){
     match target_domain.name.as_str() {
         "test.benelli.dev" => {},
-        "wwww.tagesanzeiger.ch" => {},
-        "www.nzz.ch" => {},
+        "www.nzz.ch" => {
+            let addr: Uri = "https://www.nzz.ch".parse().unwrap();
+            let (_response,body) = send_https_request_all_paraemeter(&addr, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
+            let body = String::from_utf8(body).unwrap();
+            let userinforegex = Regex::new("window.nzzUserInfo = ([^;]*)").unwrap();
+            let data = userinforegex.captures(&body).unwrap();
+            let json: Value = serde_json::from_str(data.get(1).unwrap().as_str()).unwrap();
+            let firstname = (json["first_name"]).as_str().unwrap();
+            let lastname = (json["last_name"]).as_str().unwrap();
+            let _user_id = (json["user_id"]).as_str().unwrap();
+            let _session_id = (json["session_id"]).as_str().unwrap();
+            let escapedfirstname = format!("\"{}\"", firstname);      
+            let escapedlastname = format!("\"{}\"", lastname);            
+      
+            if escapedfirstname != "" {
+                regexes.push(Regex::new(&String::from(escapedfirstname)).unwrap());
+            }
+            if escapedlastname != "" {
+                regexes.push(Regex::new(&String::from(escapedlastname)).unwrap());
+            }
+            //println!("regex: {}", &data[1]);
+        },
         "zattoo.com" => {
             let addr: Uri = "https://zattoo.com/zapi/v3/session".parse().unwrap();
             let (_response,body) = send_https_request_all_paraemeter(&addr, 443, Method::GET, &String::new(), &vec![(String::from("Connection"), String::from("Keep-alive")), (String::from("Cookie"), cookie.to_string())]).unwrap();
@@ -808,7 +855,7 @@ pub fn create_sanitizer_regex(target_domain: & Domain, cookie: &String, regexes:
             let login = String::from((json["account"]["name"]).as_str().unwrap());
             let regex = Regex::new(&login).unwrap();
             regexes.push(regex);
-            println!("Response zattoo {}", login);
+            //println!("Response zattoo {}", login);
         },
         _ => {}
     };

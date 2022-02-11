@@ -55,7 +55,6 @@ extern crate sgx_types;
 
 use rustls::{Session, NoClientAuth};
 use mio::net::{TcpListener, TcpStream};
-use sgx_types::uint8_t;
 use codec::{alloc::string::String};
 use std::{
 	string::ToString,
@@ -597,8 +596,8 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 }
 
 
-#[no_mangle]
-pub extern "C" fn run_server(_max_conn: uint8_t) {
+
+pub fn run_server(max_conn: u16) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
     //let cert = "end.fullchain";
     let cert = "localhost.crt"; // TODO: add it to the browser
@@ -619,7 +618,6 @@ pub extern "C" fn run_server(_max_conn: uint8_t) {
         .unwrap();
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-    let max_conn2 = 1024;
     let mut events = mio::Events::with_capacity(2048);
     println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
@@ -628,7 +626,8 @@ pub extern "C" fn run_server(_max_conn: uint8_t) {
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
-                    if tlsserv.connections.len() as u16 == max_conn2 {
+                    if tlsserv.connections.len() as u16 == max_conn {
+                        println!("Capacity max...");
                         continue;
                     }
                     if !tlsserv.accept(&mut poll) {

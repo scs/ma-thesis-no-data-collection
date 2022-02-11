@@ -60,7 +60,7 @@ pub struct Domain {
     pub regex_subdomains_relative: Option<Regex>,
     pub regex_general_subdomains: Option<Regex>, 
     pub auth_user: HashSet<String>,
-    pub cookie_origin: HashMap<String, String>,
+    pub cookie_origin: HashMap<String, (String, Vec<Regex>)>,
     pub whitelist: Router<String>
  
 }
@@ -672,7 +672,7 @@ pub fn cookie_validator(){
             let mut remove_indexes = Vec::new();
             for (i, cookie) in v.cookies.iter().enumerate() {
                 //println!("Cookie {} = {}", i, cookie);
-                let valid = try_out_cookie_at_target(&v, &cookie);
+                let valid = try_out_cookie_at_target(&v, &cookie, &Vec::new());
                 if !valid {
                     remove_indexes.push(i);
                 }
@@ -695,8 +695,9 @@ pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
         let cookie = target_domain.cookies.remove(*i); // remove from cookie
         let res = target_domain.cookie_origin.remove(&cookie);
         match res {
-            Some(uuid) => {
-                target_domain.auth_user.remove(&uuid);
+            Some(tuple) => {
+                // tuple = (uuid, Regexes)
+                target_domain.auth_user.remove(&tuple.0);
             },
             _ => {/* Acces already removed */}
         }
@@ -707,9 +708,10 @@ pub fn remove_invalid_cookies(domain: & String, indexes: & Vec<usize>) {
 
 pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     let target_domain = get_target_domain(&req);
-    if try_out_cookie_at_target(&target_domain, &cookie) {
+    let regexes: Vec<Regex> = Vec::new(); // need to be filled up
+    if try_out_cookie_at_target(&target_domain, &cookie, &regexes) {
         println!("[+] Cookie Validated, it will now be inserted!");
-        insert_cookie_to_target(&req, cookie);
+        insert_cookie_to_target(&req, cookie, regexes);
         true
     } else {
         println!("[xxx] Cookie Validation failed");
@@ -717,7 +719,7 @@ pub fn cookie_is_valid(req: & Request, cookie: String) -> bool {
     }
 }
 
-pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> bool {
+pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String,  regexes: &Vec<Regex>) -> bool {
     /*let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();*/
 
@@ -776,7 +778,7 @@ pub fn try_out_cookie_at_target(target_domain: & Domain, cookie: &String) -> boo
 }
 
 
-pub fn insert_cookie_to_target(req: & Request, cookie: String){
+pub fn insert_cookie_to_target(req: & Request, cookie: String, regexes: Vec<Regex>){
     let mut map = PROXY_URLS.lock().unwrap();
     let target_domain: & mut Domain = map.get_mut(req.target.as_ref().unwrap()).unwrap();
     //target_domain.cookies.push(String::from("hello"));
@@ -788,7 +790,7 @@ pub fn insert_cookie_to_target(req: & Request, cookie: String){
     let parsed_cookie = cookie_decoded.clone();
     let uuid = req.uuid.as_ref().unwrap().to_string();
     target_domain.auth_user.insert(uuid.clone());
-    target_domain.cookie_origin.insert(cookie_decoded, uuid);
+    target_domain.cookie_origin.insert(cookie_decoded, (uuid, regexes));
 
     target_domain.cookies.push(parsed_cookie);
 

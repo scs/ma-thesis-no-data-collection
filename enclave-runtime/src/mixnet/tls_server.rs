@@ -457,6 +457,7 @@ impl Connection {
             } 
         };
         self.send_response(res);
+        self.tls_session.send_close_notify();
     }
 
     fn send_response(&mut self, response: Vec<u8>){

@@ -457,7 +457,7 @@ impl Connection {
             } 
         };
         self.send_response(res);
-        self.tls_session.send_close_notify();
+        //self.tls_session.send_close_notify();
     }
 
     fn send_response(&mut self, response: Vec<u8>){
@@ -598,7 +598,7 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 
 
 
-pub fn run_server(max_conn: u16) {
+pub fn run_server(max_conn: u32) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
     //let cert = "end.fullchain";
     let cert = "localhost.crt"; // TODO: add it to the browser
@@ -610,6 +610,7 @@ pub fn run_server(max_conn: u16) {
     let config = make_config(cert, key);
 
     let listener = TcpListener::bind(&addr).expect("cannot listen on port");
+    //listener.set_ttl(300).expect("could not set TTL");
     let mut poll = mio::Poll::new()
         .unwrap();
     poll.register(&listener,
@@ -619,7 +620,7 @@ pub fn run_server(max_conn: u16) {
         .unwrap();
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-    let mut events = mio::Events::with_capacity(2048);
+    let mut events = mio::Events::with_capacity(1024*32);
     println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
     'outer: loop {
         poll.poll(&mut events, None)
@@ -627,7 +628,7 @@ pub fn run_server(max_conn: u16) {
         for event in events.iter() {
             match event.token() {
                 LISTENER => {
-                    if tlsserv.connections.len() as u16 == max_conn {
+                    if tlsserv.connections.len() as u32 == max_conn {
                         println!("Capacity max...");
                         continue;
                     }

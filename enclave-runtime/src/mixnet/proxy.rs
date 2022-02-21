@@ -42,9 +42,9 @@ const HEAD_503: &[u8; 120] = b"HTTP/1.1 503 Service Unavailable \r\n\
 
 const _DUR_HALF_SEC: Option<Duration> = Some(Duration::from_millis(500));
 const _DUR_ONE_SEC: Option<Duration> = Some(Duration::from_millis(1000));
-const _DUR_ONE_AND_HALF_SEC: Option<Duration> = Some(Duration::from_millis(1000));
+const _DUR_ONE_AND_HALF_SEC: Option<Duration> = Some(Duration::from_millis(1500));
 const _DUR_TWO_SEC: Option<Duration> = Some(Duration::from_millis(2000));
-const DUR_FIVE_SEC: Option<Duration> = Some(Duration::from_millis(2000));
+const DUR_FIVE_SEC: Option<Duration> = Some(Duration::from_millis(5000));
 
 #[derive(Clone,Debug)]
 pub struct Domain {

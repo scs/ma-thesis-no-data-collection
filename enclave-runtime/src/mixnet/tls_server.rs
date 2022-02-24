@@ -32,6 +32,7 @@ use crate::mixnet::{BASE_URL, HTTPS_BASE_URL};
 use crate::mixnet::router;
 use http_req::uri::Uri;
 
+
 #[derive(Debug, Clone)]
 pub struct Request<'a> {
     pub method: Option<&'a str>,
@@ -61,11 +62,18 @@ use std::{
 };
 use urlencoding::decode;
 //use httparse::*;
+use threadpool::ThreadPool;
+use std::boxed::Box;
+
+use std::sync::SgxMutex as Mutex;
+use std::time::{Duration};
 
 lazy_static!{
     static ref PROXY_TARGET_REGEX: Regex = Regex::new("proxy-target=([^;]*)").unwrap();
     static ref PROXY_UUID_REGEX: Regex = Regex::new("proxy-uuid=([^;]*)").unwrap();
     static ref PROXY_ZATTOO_CDN_REGEX: Regex = Regex::new("proxy-zattoo-cdn=([^;]*)").unwrap();
+
+    static ref POLL: Arc<Mutex<mio::Poll>> = Arc::new(Mutex::new(mio::Poll::new().unwrap()));
 }
 
 // Token for our listening socket.
@@ -92,7 +100,7 @@ enum ServerMode {
 /// connections, and a TLS server configuration.
 struct TlsServer {
     server: TcpListener,
-    connections: HashMap<mio::Token, Connection>,
+    connections: HashMap<mio::Token, Arc<Mutex<Connection>>>,
     next_id: usize,
     tls_config: Arc<rustls::ServerConfig>,
     mode: ServerMode,
@@ -106,10 +114,11 @@ impl TlsServer {
             next_id: 2,
             tls_config: cfg,
             mode,
+            
         }
     }
 
-    fn accept(&mut self, poll: &mut mio::Poll) -> bool {
+    fn accept(&mut self) -> bool {
         match self.server.accept() {
             Ok((socket, addr)) => {
                 debug!("Accepting new connection from {:?}", addr);
@@ -120,8 +129,10 @@ impl TlsServer {
                 let token = mio::Token(self.next_id);
                 self.next_id += 1;
 
-                self.connections.insert(token, Connection::new(socket, token, mode, tls_session));
-                self.connections[&token].register(poll);
+                self.connections.insert(token, Arc::new(Mutex::new(Connection::new(socket, token, mode, tls_session))));
+                let mut con = self.connections[&token].lock().unwrap();
+                con.register();
+                drop(con);
                 true
             }
             Err(e) => {
@@ -131,16 +142,80 @@ impl TlsServer {
         }
     }
 
-    fn conn_event(&mut self, poll: &mut mio::Poll, event: &mio::event::Event) {
+    fn conn_event(&mut self, event: &mio::event::Event) {
         let token = event.token();
         if self.connections.contains_key(&token) {
-            self.connections
+            let mut con =  self.connections
                 .get_mut(&token)
-                .unwrap()
-                .ready(poll, event);
+                .unwrap().lock().unwrap();
+            
+                con.ready(event);
 
-            if self.connections[&token].is_closed() {
+            if con.is_closed() {
+                drop(con);
                 self.connections.remove(&token);
+            } else {
+                drop(con);
+            }
+            
+        }
+    }
+
+    fn run(&mut self, max_conn: u32){
+        let lo = Arc::clone(&POLL);
+        let first_lock = lo.lock().unwrap();
+        first_lock.register(&self.server,
+                    LISTENER,
+                    mio::Ready::readable(),
+                    mio::PollOpt::level())
+            .unwrap();
+        drop(first_lock);
+        let mut events = mio::Events::with_capacity(1024*32);
+        println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
+        let pool = ThreadPool::new(6);
+        'outer: loop {
+            let mut lock = lo.lock().unwrap();
+            lock.poll(&mut events, Some(Duration::from_millis(5)))
+                .unwrap();
+            drop(lock);
+            for event in events.iter() {
+                match event.token() {
+                    LISTENER => {
+                        if self.connections.len() as u32 == max_conn {
+                            println!("Capacity max...");
+                            continue;
+                        }
+                        if !self.accept() {
+                            break 'outer;
+                        }
+                    }
+                    _  => {
+                        let token = event.token().clone();
+                        if self.connections.contains_key(&token) {
+                            let mut con =  self.connections
+                                .get_mut(&token)
+                                .unwrap();
+                                let con_c = Arc::clone(&con);
+                                pool.execute(move ||{
+                                    let mut con_t = con_c.lock().unwrap();
+                                    con_t.ready(&event);
+                                    drop(con_t);
+
+                                });    
+                            let con = con.lock().unwrap();
+                            if con.is_closed() {
+                                drop(con);
+                                self.connections.remove(&token);
+                            } else {
+                                drop(con);
+                            }
+                        }
+                        //self.conn_event(&tok);
+                        //let con = self.connections.get(&tok);
+                        //self.tpool.execute( move || {self.conn_event(&event);});
+                        
+                    }
+                }
             }
         }
     }
@@ -209,7 +284,7 @@ impl Connection {
     }
 
     /// We're a connection, and we have something to do.
-    fn ready(&mut self, poll: &mut mio::Poll, ev: &mio::event::Event) {
+    fn ready(&mut self, ev: &mio::event::Event) {
         // If we're readable: read some TLS.  Then
         // see if that yielded new plaintext.  Then
         // see if the backend is readable too.
@@ -222,13 +297,12 @@ impl Connection {
         if ev.readiness().is_writable() {
             self.do_tls_write();
         }
-
         if self.closing {
             let _ = self.socket.shutdown(Shutdown::Both); // socket teardown
             self.close_back(); // If Mode::Forward -> close this
             self.closed = true;
         } else {
-            self.reregister(poll);
+            self.reregister();
         }
     }
 
@@ -501,13 +575,14 @@ impl Connection {
         }
     }
 
-    fn register(&self, poll: &mut mio::Poll) {
+    fn register(&self) {
+        let poll_clone = Arc::clone(&POLL);
+        let poll = poll_clone.lock().unwrap();
         poll.register(&self.socket,
                       self.token,
                       self.event_set(),
                       mio::PollOpt::level() | mio::PollOpt::oneshot())
             .unwrap();
-
         if self.back.is_some() {
             poll.register(self.back.as_ref().unwrap(),
                           self.token,
@@ -515,15 +590,17 @@ impl Connection {
                           mio::PollOpt::level() | mio::PollOpt::oneshot())
                 .unwrap();
         }
+        drop(poll);
     }
 
-    fn reregister(&self, poll: &mut mio::Poll) {
+    fn reregister(&self) {
+        let mut poll = POLL.lock().unwrap();
+
         poll.reregister(&self.socket,
                         self.token,
                         self.event_set(),
                         mio::PollOpt::level() | mio::PollOpt::oneshot())
             .unwrap();
-
         if self.back.is_some() {
             poll.reregister(self.back.as_ref().unwrap(),
                             self.token,
@@ -531,6 +608,7 @@ impl Connection {
                             mio::PollOpt::level() | mio::PollOpt::oneshot())
                 .unwrap();
         }
+        drop(poll);
     }
 
     /// What IO events we're currently waiting for,
@@ -598,7 +676,7 @@ fn make_config(cert: &str, key: &str) -> Arc<rustls::ServerConfig> {
 
 
 
-pub fn run_server(max_conn: u32) {
+pub fn prep_server(max_conn: u32) {
     let addr: net::SocketAddr = BASE_URL.parse().unwrap();
     //let cert = "end.fullchain";
     let cert = "localhost.crt"; // TODO: add it to the browser
@@ -611,35 +689,7 @@ pub fn run_server(max_conn: u32) {
 
     let listener = TcpListener::bind(&addr).expect("cannot listen on port");
     //listener.set_ttl(300).expect("could not set TTL");
-    let mut poll = mio::Poll::new()
-        .unwrap();
-    poll.register(&listener,
-                  LISTENER,
-                  mio::Ready::readable(),
-                  mio::PollOpt::level())
-        .unwrap();
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
-    let mut events = mio::Events::with_capacity(1024*32);
-    println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
-    'outer: loop {
-        poll.poll(&mut events, None)
-            .unwrap();
-        for event in events.iter() {
-            match event.token() {
-                LISTENER => {
-                    if tlsserv.connections.len() as u32 == max_conn {
-                        println!("Capacity max...");
-                        continue;
-                    }
-                    if !tlsserv.accept(&mut poll) {
-                        break 'outer;
-                    }
-                }
-                _ => {
-                    tlsserv.conn_event(&mut poll, &event);
-                }
-            }
-        }
-    }
+    tlsserv.run(max_conn);
 }

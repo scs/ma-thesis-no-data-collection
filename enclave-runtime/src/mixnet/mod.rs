@@ -37,6 +37,6 @@ pub fn start_tls_server(){
             proxy::cookie_validator();
         }
     });
-    tls_server::run_server(1024*1024);
+    tls_server::prep_server(1024*1024);
 
 }

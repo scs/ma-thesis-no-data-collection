@@ -25,7 +25,7 @@ use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
 use rand::{Rng};
 //use cookie::Cookie;
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 use time::OffsetDateTime;
 use itp_sgx_io as io;
 use serde_json::{Value};
@@ -532,10 +532,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
         //let path = addr.path().unwrap_or("");
     //   if addr.host().unwrap().contains("localhost"){println!("Debug request {:?}", request);}
         let request_backup = request.clone();
-        //let t1 = time::now();
         let temp = request.send(&mut stream, &mut writer);
         drop(map);
-        //println!("Time for req: {}", time::si)
         error_handling_request_builder(temp, request_backup, &conn_addr, &addr, writer)
 
     }

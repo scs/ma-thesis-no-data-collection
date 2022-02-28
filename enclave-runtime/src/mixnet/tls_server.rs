@@ -66,7 +66,7 @@ use threadpool::ThreadPool;
 use std::boxed::Box;
 
 use std::sync::SgxMutex as Mutex;
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 
 lazy_static!{
     static ref PROXY_TARGET_REGEX: Regex = Regex::new("proxy-target=([^;]*)").unwrap();
@@ -175,7 +175,7 @@ impl TlsServer {
         let pool = ThreadPool::new(6);
         'outer: loop {
             let mut lock = lo.lock().unwrap();
-            lock.poll(&mut events, Some(Duration::from_millis(5)))
+            lock.poll(&mut events, Some(Duration::from_millis(1)))
                 .unwrap();
             drop(lock);
             for event in events.iter() {
@@ -200,7 +200,6 @@ impl TlsServer {
                                     let mut con_t = con_c.lock().unwrap();
                                     con_t.ready(&event);
                                     drop(con_t);
-
                                 });    
                             let con = con.lock().unwrap();
                             if con.is_closed() {
@@ -460,7 +459,7 @@ impl Connection {
                     for i in 0..req.headers.len() { // Adding Headers to Hasmap
                         let h = req.headers[i];
                         let value =  String::from_utf8(h.value.to_vec()).expect("Header error");
-                        parsed_req.headers.insert(h.name.to_string(), value);
+                        parsed_req.headers.insert(h.name.to_string().to_lowercase(), value);
                     }
                     //Debug:
                     //println!("Debug valide-headers: {:?}", parsed_req.headers);
@@ -471,8 +470,8 @@ impl Connection {
                         println!("Debug valide-path: {:?}", parsed_req.path);
 
                     }*/
-                    if parsed_req.headers.contains_key("Cookie"){ // Getting Target adn UUID from Cookie
-                        let cookie = parsed_req.headers.get("Cookie").unwrap();
+                    if parsed_req.headers.contains_key("cookie") { // Getting Target adn UUID from Cookie
+                        let cookie = parsed_req.headers.get("cookie").unwrap();
                         let target = match PROXY_TARGET_REGEX.captures(cookie.as_str()) {
                             Some(res) => Some(String::from(res.get(1).unwrap().as_str())),
                             _ => None,
@@ -516,6 +515,7 @@ impl Connection {
     fn handle_request(&mut self, buf: &[u8]){
         let res = match self.parse_request(&buf) {
             Ok(req) => {
+                //println!("Debug: {:?}", req);
                 match req.path {
                     Some(ref path) => {
                         router::handle_routes(path, req).unwrap()

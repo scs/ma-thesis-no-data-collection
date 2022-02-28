@@ -688,7 +688,7 @@ pub fn prep_server(max_conn: u32) {
     let config = make_config(cert, key);
 
     let listener = TcpListener::bind(&addr).expect("cannot listen on port");
-    //listener.set_ttl(300).expect("could not set TTL");
+    listener.set_ttl(5).expect("could not set TTL");
 
     let mut tlsserv = TlsServer::new(listener, mode, config);
     tlsserv.run(max_conn);

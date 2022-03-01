@@ -45,7 +45,8 @@ pub struct Request<'a> {
     pub zattoo_cdn: Option<String>,
     pub uuid: Option<String>,
     pub inital_auth_req: bool,
-    pub regexes: Vec<Regex>
+    pub regexes: Vec<Regex>,
+    pub t_id: u64
 }
 use regex::Regex;
 
@@ -73,7 +74,7 @@ lazy_static!{
     static ref PROXY_UUID_REGEX: Regex = Regex::new("proxy-uuid=([^;]*)").unwrap();
     static ref PROXY_ZATTOO_CDN_REGEX: Regex = Regex::new("proxy-zattoo-cdn=([^;]*)").unwrap();
 
-    static ref POLL: Arc<Mutex<mio::Poll>> = Arc::new(Mutex::new(mio::Poll::new().unwrap()));
+    static ref POLL: Arc<mio::Poll> = Arc::new(mio::Poll::new().unwrap());
 }
 
 // Token for our listening socket.
@@ -162,22 +163,19 @@ impl TlsServer {
     }
 
     fn run(&mut self, max_conn: u32){
-        let lo = Arc::clone(&POLL);
-        let first_lock = lo.lock().unwrap();
-        first_lock.register(&self.server,
-                    LISTENER,
-                    mio::Ready::readable(),
-                    mio::PollOpt::level())
+        POLL.register(&self.server,
+            LISTENER,
+            mio::Ready::readable(),
+            mio::PollOpt::level())
             .unwrap();
-        drop(first_lock);
-        let mut events = mio::Events::with_capacity(1024*32);
+        let mut events = mio::Events::with_capacity(256);
+
         println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
         let pool = ThreadPool::new(6);
+        //println!("num_cs {}",num_tcs);
         'outer: loop {
-            let mut lock = lo.lock().unwrap();
-            lock.poll(&mut events, Some(Duration::from_millis(1)))
-                .unwrap();
-            drop(lock);
+            POLL.poll(&mut events, None)
+            .unwrap();
             for event in events.iter() {
                 match event.token() {
                     LISTENER => {
@@ -454,7 +452,8 @@ impl Connection {
                         zattoo_cdn: None,
                         uuid: None,
                         inital_auth_req: false,
-                        regexes: Vec::new()
+                        regexes: Vec::new(),
+                        t_id: std::thread::current().id().as_u64().get()
                     };
                     for i in 0..req.headers.len() { // Adding Headers to Hasmap
                         let h = req.headers[i];
@@ -576,39 +575,34 @@ impl Connection {
     }
 
     fn register(&self) {
-        let poll_clone = Arc::clone(&POLL);
-        let poll = poll_clone.lock().unwrap();
-        poll.register(&self.socket,
+ 
+        POLL.register(&self.socket,
                       self.token,
                       self.event_set(),
                       mio::PollOpt::level() | mio::PollOpt::oneshot())
             .unwrap();
         if self.back.is_some() {
-            poll.register(self.back.as_ref().unwrap(),
+            POLL.register(self.back.as_ref().unwrap(),
                           self.token,
                           mio::Ready::readable(),
                           mio::PollOpt::level() | mio::PollOpt::oneshot())
                 .unwrap();
         }
-        drop(poll);
     }
 
     fn reregister(&self) {
-        let mut poll = POLL.lock().unwrap();
-
-        poll.reregister(&self.socket,
+        POLL.reregister(&self.socket,
                         self.token,
                         self.event_set(),
                         mio::PollOpt::level() | mio::PollOpt::oneshot())
             .unwrap();
         if self.back.is_some() {
-            poll.reregister(self.back.as_ref().unwrap(),
+            POLL.reregister(self.back.as_ref().unwrap(),
                             self.token,
                             mio::Ready::readable(),
                             mio::PollOpt::level() | mio::PollOpt::oneshot())
                 .unwrap();
         }
-        drop(poll);
     }
 
     /// What IO events we're currently waiting for,

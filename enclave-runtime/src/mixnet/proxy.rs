@@ -19,7 +19,7 @@ use std::{
 };
 //use std::io::prelude::*;
 use regex::Regex;
-use crate::mixnet::{HTTPS_BASE_URL, BASE_LOCALHOST_URL};
+use crate::mixnet::{HTTPS_BASE_URL, BASE_LOCALHOST_URL, TCS_NUM};
 use std::collections::{HashMap, HashSet};
 use std::sync::SgxMutex as Mutex;
 use sgx_rand as rand;
@@ -74,19 +74,13 @@ Helper Funcs and Var
 ------------------------
 */
 lazy_static! {
-    static ref PROXY_TLS_CONN: Mutex<HashMap<String, Conn<std::net::TcpStream>>> = {
-        let m = HashMap::new();/*
-        //let tls_session = lines_from_file("ma-thesis/tls_sessions.txt", 1);
-        let a = String::from("https://test.benelli.dev");
-        let addr: Uri = a.parse().unwrap();
-        let port: u16 = 443;
-        let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
-
-        let stream = create_tcp_stream(&conn_addr, &addr);
-        let host = String::from(addr.host().unwrap());
-        m.insert(host, stream);*/
-
-        Mutex::new(m)
+    static ref PROXY_TLS_CONN: Vec<Mutex<HashMap<String, Conn<std::net::TcpStream>>>> = {
+        let mut vec = Vec::new();
+        for i in 0..*TCS_NUM {
+            let m = HashMap::new();
+            vec.push(Mutex::new(m));
+        };
+        vec
     };
     static ref PROXY_URLS: Mutex<HashMap<String, Domain>> = {
 //        static ref PROXY_URLS: Mutex<HashMap<String, Domain<'static>>> = {
@@ -125,8 +119,7 @@ lazy_static! {
 
 
             }
-
-            m.insert(String::from(line.0), Domain{
+            let mut dom = Domain{
                 name: String::from(line.0),
                 uri: https_url.parse().unwrap(),
                 login_check_uri: line.1.parse().unwrap_or(https_url.parse().unwrap()),
@@ -140,7 +133,10 @@ lazy_static! {
                 auth_user: HashSet::new(),
                 cookie_origin: HashMap::new(),
                 whitelist: r,
-            });
+            };
+            dom.auth_user.insert("perf_test".to_string());
+
+            m.insert(String::from(line.0), dom );
         };
         Mutex::new(m)
     };
@@ -509,7 +505,8 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
     else {
             let conn_addr = format!("{}:{}", addr.host().unwrap(), addr.port().unwrap_or(port));
             // get TLS Session
-            let mut map = PROXY_TLS_CONN.lock().unwrap();
+            let t_id = std::thread::current().id().as_u64().get() as usize;
+            let mut map = PROXY_TLS_CONN[t_id].lock().unwrap();
             let host = String::from(addr.host().unwrap());
             let mut stream = if map.contains_key(&host as &str){
                 //println!("Reusing TLS Connection");
@@ -521,11 +518,12 @@ pub fn send_https_request_all_paraemeter(addr: &Uri, port: u16, method: Method, 
                 let stream = create_tcp_stream(&conn_addr, &addr);
                 insert_tls_stream(&host, stream);
                 //println!("Added");
-                map = PROXY_TLS_CONN.lock().unwrap();
+                map = PROXY_TLS_CONN[t_id].lock().unwrap();
                 map.get_mut(&addr.host().unwrap() as &str).unwrap()
 
             };
             //drop(map);
+            //let mut stream = create_tcp_stream(&conn_addr, &addr);
         //request.timeout(Some(Duration::from_millis(1500)));
         request.header("Content-Length", &body.as_bytes().len())
         .body(body.as_bytes());
@@ -555,7 +553,8 @@ pub fn error_handling_request_builder(handle: Result<Response, ReqError>, reques
                             
                             insert_tls_stream(&addr.host().unwrap().to_string(), stream);
                             writer = Vec::new();
-                            let mut map = PROXY_TLS_CONN.lock().unwrap();
+                            let t_id = std::thread::current().id().as_u64().get() as usize;
+                            let mut map = PROXY_TLS_CONN[t_id].lock().unwrap();
                             let mut stream = map.get_mut(&addr.host().unwrap() as &str).unwrap();
                             let request = request_backup.clone();
                             let temp = request.send(&mut stream, &mut writer);
@@ -619,7 +618,9 @@ pub fn get_tcp_stream<'a>(addr: & 'static Uri, port: u16) -> & 'static Conn<std:
 */
 pub fn insert_tls_stream(host: & String, stream: Conn<std::net::TcpStream>){
     let key = String::from(host);
-    let mut map = PROXY_TLS_CONN.lock().unwrap();
+    let t_id = std::thread::current().id().as_u64().get() as usize;
+
+    let mut map = PROXY_TLS_CONN[t_id].lock().unwrap();
     map.insert(key, stream);
 
     drop(map);

@@ -168,7 +168,7 @@ impl TlsServer {
             mio::Ready::readable(),
             mio::PollOpt::level())
             .unwrap();
-        let mut events = mio::Events::with_capacity(256);
+        let mut events = mio::Events::with_capacity(512);
 
         println!("[+] Server in Enclave is running now on: {}", HTTPS_BASE_URL);
         let pool = ThreadPool::new(6);

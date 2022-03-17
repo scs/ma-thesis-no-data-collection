@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title> Proxy Login Page!</title>
+  <title>No Data Collection!</title>
   <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png">
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon/favicon-32x32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/favicon/favicon-16x16.png">
@@ -152,12 +152,11 @@
 </style>
 <body>
 <div class="center">
-  <h1>Hello!</h1>
-  <p>Provide your Credentials and select service</p>
+  <p>Select service and provide your session-cookie</p>
 </div>
 <div class="center">
   <select id="form_action">
-    <option value="">--- Wähle Service ---</option>
+    <option value="">--- Select Service ---</option>
     <option value="test.benelli.dev">test-service</option>
     <option value="www.tagesanzeiger.ch">tagesanzeiger.ch</option>
     <option value="www.nzz.ch">nzz.ch</option>
@@ -180,15 +179,11 @@
       <input type='button' value='Login' onclick="setProxyTarget()"/>
     </div>
   </form>
-  <p>Either export Cookies from Cookie-Editor-Addon or create your raw cookies</p>
+  <p>Either export cookies from Cookie-Editor-Addon or add your raw cookies</p>
   <ul>
-    <li>target-service: target-session</li>
-    <li>refreshToken=643d41d08d78ec4b8c08a8cd4d0c8f508;</li>
-    <li>tagesanzeiger: refreshToken (Achtung: Reload Link necessary!)</li>
+    <li>tagesanzeiger: refreshToken</li>
     <li>nzz.ch: cresid_nzz</li>
-    <li>cresid_nzz=bbe2e262ab43acf4d0da236cf6684071;</li>
-    <li>zattoo.com: pzuid und breaker.session</li>
-    <li>changing...</li>
+    <li>zattoo.com: pzuid and breaker.session</li>
   </ul>
 </div>
 </body>

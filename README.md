@@ -42,7 +42,7 @@ Preparation:
 cd ~/bin
 # create empty INTEL key files
 touch spid.txt key.txt
-# fill the files with your Intel SGX development and production (commercial) license
+# fill the files with your Intel SGX development or production (commercial) license
 echo "<YOUR SPID>" > bin/spid.txt
 echo "<YOUR KEY>" > bin/key.txt
 # prepare service

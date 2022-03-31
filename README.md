@@ -1,65 +1,60 @@
-# integritee-worker
+This repo contains the code base for the master thesis ****Towards User Privacy for Subscription Based Services****.
 
-Integritee worker for Integritee [node](https://github.com/integritee-network/integritee-node) or [parachain](https://github.com/integritee-network/parachain)
 
-This is part of [Integritee](https://integritee.network)
 
-## Build and Run
-Please see our [Integritee Book](https://book.integritee.network/howto_worker.html) to learn how to build and run this.
+------------
+# Preparation
 
-## Tests
-### environment
-Unit tests within the enclave can't be run by `cargo test`. All unit and integration tests can be run by the worker binary
 
-first, you should run ipfs daemon because it is needed for testing
-```
-ipfs daemon
-```
-second, you'll need a integritee-node running
-```
-./target/release/integritee-node --dev --execution native
-```
-then you should make sure that the sealed_state is empty (but exists)
-```
-worker/bin$ rm sealed_stf_state.bin
-worker/bin$ touch sealed_stf_state.bin
-```
+Before you can start MIXNET, you need a running [integritee-node](https://github.com/integritee-network/integritee-node "integritee-node"). The last version we used was commit 6b3f13932775f71c414d02bed8abac808cb75f73 .
 
-### execute tests
-Run these with
+Build the node:
 ```
-integritee-service/bin$ ./integritee-service test_enclave --all
+# clone and build the node
+cd ..
+git clone https://github.com/integritee-network/integritee-node.git
+cd integritee-node
+# Install the correct rust-toolchain 
+rustup show
+# build the node
+cargo build --release
+# another 10min
+````
+After successfully building you can start the node with these example parameters:
+`./target/release/integritee-node --dev --tmp --ws-port 9995 --port 30395 --rpc-port 9996`
+
+# MIXNET
+
+Building MIXNET:
 ```
-
-### End-to-end test with benchmarking
-
-Including cleanup between runs:
-
-run node
-```
-./target/release/integritee-node purge-chain --dev
-./target/release/integritee-node --dev --ws-port 9979
-```
-
-run worker
+# clone and build the worker and the client
+git clone https://github.com/integritee-network/worker.git
+cd worker
+# Install the correct rust-toolchain 
+rustup show
+SGX_MODE=SW make
+# this might take 10min+ on a fast machine
 
 ```
-export RUST_LOG=debug,substrate_api_client=warn,sp_io=warn,ws=warn,integritee_service=info,enclave_runtime=info,sp_io::misc=debug,runtime=debug,enclave_runtime::state=warn,ita_stf::sgx=info,light_client=warn,rustls=warn
-rm -rf shards/ light_client_db.bin
-./integritee-service -r 2002 -p 9979 -w 2001 run 2>&1 | tee worker.log
+
+Preparation:
+```
+cd ~/bin
+# create empty INTEL key files
+touch spid.txt key.txt
+# fill the files with your Intel SGX development or production (commercial) license
+echo "<YOUR SPID>" > bin/spid.txt
+echo "<YOUR KEY>" > bin/key.txt
+# prepare service
+./integritee-service init-shard
+./integritee-service shielding-key
+./integritee-service signing-key
+./integritee-service mrenclave > ~/mrenclave.b58
+./integritee-service run --skip-ra
 ```
 
-wait until you see the worker synching a few blocks. then check MRENCLAVE and update bot-community.py constants accordingly
+After building and preparing MIXNET, you can run it using the following commands:
+`cd bin/ && ./integritee-service -p 9995 mixnet`
+Make sure that the port is the same as the one you used for --ws-port in the Integritee-node.
 
-```
-./integritee-cli -p 9979 list-workers
-```
-
-now bootstrap a new bot community
-
-```
-./bot-community.py init
-./bot-community.py benchmark
-```
-
-now you should see the community growing from 10 to hundreds, increasing with every ceremony
+To add new services, edit the [services.txt](https://github.com/scs/ma-thesis-no-data-collection/blob/main/bin/ma-thesis/services.txt "services.txt") file and don't forget to add corresponding logic to the [frontend selection](https://github.com/scs/ma-thesis-no-data-collection/blob/main/bin/ma-thesis/html/index.html "frontend selection") as well as necessary adjustments in the [proxy-module](https://github.com/scs/ma-thesis-no-data-collection/blob/main/enclave-runtime/src/mixnet/proxy.rs "proxy-module") (Cookie Validation, special cases etc).
